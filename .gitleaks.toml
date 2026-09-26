@@ -1,0 +1,18 @@
+title = "job-agent gitleaks config"
+
+# Start from gitleaks' built-in rules (Anthropic, GCP API keys, private keys,
+# GCP service accounts, GitHub tokens, ...) and add the ones it lacks.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "langsmith-api-key"
+description = "LangSmith API key"
+regex = '''\b(?:lsv2_(?:pt|sk)_[0-9a-f]{32}_[0-9a-f]{10}|ls__[0-9a-f]{32})\b'''
+keywords = ["lsv2_", "ls__"]
+
+[[rules]]
+id = "google-oauth-access-token"
+description = "Google OAuth access token"
+regex = '''\bya29\.[0-9A-Za-z_\-]{20,}'''
+keywords = ["ya29."]

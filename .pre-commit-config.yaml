@@ -1,0 +1,23 @@
+# Install once per clone:  pre-commit install
+# (installs both the pre-commit and commit-msg hooks below)
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: check-pii
+        name: block personal data, private keys, and private files
+        entry: python3 scripts/check_pii.py
+        language: system
+        stages: [pre-commit]
+
+      - id: check-pii-commit-msg
+        name: block personal data in commit messages
+        entry: python3 scripts/check_pii.py
+        language: system
+        stages: [commit-msg]

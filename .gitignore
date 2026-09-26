@@ -1,0 +1,71 @@
+# ---------------------------------------------------------------------------
+# This repo is public. Personal data lives in $JOBAGENT_HOME (~/.jobagent/),
+# never in this tree. These rules are a second line of defense; the
+# pre-commit hook (scripts/check_pii.py) also rejects these paths if they are
+# force-added.
+# ---------------------------------------------------------------------------
+
+# --- Secrets & environment ---
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# JSON is ignored by default because service-account keys are JSON.
+# Tracked JSON files must be explicitly un-ignored here.
+*.json
+!.claude/settings.json
+
+# --- Personal data ---
+private/
+data/
+output/
+screenshots/
+browser_profile/
+checkpoints/
+*.pdf
+*.log
+*.sqlite
+*.sqlite3
+*.sqlite-*
+*.db
+.langsmith
+.langsmith/
+
+# Real resume / profile / bullets must stay in ~/.jobagent/. Only the fake
+# fixtures under examples/ are tracked.
+*.tex
+bullets.yaml
+profile.yaml
+!examples/**/*.tex
+!examples/**/bullets.yaml
+!examples/**/profile.yaml
+
+# --- LaTeX build artifacts ---
+*.aux
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.toc
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+
+# --- Editors / OS / local tool config ---
+.claude/settings.local.json
+.idea/
+.vscode/
+.DS_Store

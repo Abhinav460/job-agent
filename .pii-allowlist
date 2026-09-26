@@ -1,0 +1,15 @@
+# Matches that scripts/check_pii.py ignores. One Python regex per line; a
+# finding is allowed if the matched text fully matches any line.
+# Keep this list SMALL. Never add a real person's email or phone number.
+
+# RFC 2606 / RFC 6761 reserved domains, used by the fake fixtures in examples/.
+[\w.+-]+@example\.(com|org|net)
+[\w.+-]+@[\w.-]+\.(invalid|test|example)
+
+# Commit trailers and git remotes.
+noreply@anthropic\.com
+[\w.+-]+@users\.noreply\.github\.com
+git@github\.com
+
+# Fictional US phone numbers (555-0100 through 555-0199).
+.*555[\s.-]?01\d\d
