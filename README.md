@@ -38,8 +38,10 @@ Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/),
 
 ```bash
 git clone <this repo> && cd job-agent
+uv sync                     # create .venv and install dependencies
 pre-commit install          # installs the pre-commit and commit-msg hooks
 cp .env.example .env        # then fill in values in your editor
+uv run pytest               # includes redaction and PII-check tests
 ```
 
 Never paste keys into an issue, a chat, or a terminal command. Put them in

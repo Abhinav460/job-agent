@@ -1,0 +1,1 @@
+"""Personal job-application agent."""
