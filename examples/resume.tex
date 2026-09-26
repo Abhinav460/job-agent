@@ -1,0 +1,120 @@
+%-------------------------
+% FAKE fixture for an obviously fake person. Copy to $JOBAGENT_HOME/resume.tex
+% (jobagent init does this) and replace with your own resume.
+%
+% Based on Jake Gutierrez's resume template (MIT license):
+% https://github.com/jakegut/resume
+%
+% job-agent only replaces text between the marker comments below:
+%   % BEGIN:EXPERIENCE / % END:EXPERIENCE   (required)
+%   % BEGIN:PROJECTS   / % END:PROJECTS     (optional)
+%   % BEGIN:SKILLS     / % END:SKILLS       (optional)
+% Everything else (header, education, styling) is yours and is never touched.
+%-------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+\begin{document}
+
+\begin{center}
+    \textbf{\Huge \scshape Testy McTestface} \\ \vspace{1pt}
+    \small (555) 555-0142 $|$ \href{mailto:testy.mctestface@example.com}{\underline{testy.mctestface@example.com}} $|$
+    \href{https://example.com}{\underline{example.com}}
+\end{center}
+
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {Fictional University}{Springfield, USA}
+      {Bachelor of Science in Computer Science}{Aug. 2022 -- May 2026}
+  \resumeSubHeadingListEnd
+
+\section{Experience}
+  \resumeSubHeadingListStart
+    % BEGIN:EXPERIENCE
+    \resumeSubheading
+      {Software Engineering Intern}{Jun 2025 -- Aug 2025}
+      {Example Corp}{Springfield, USA}
+      \resumeItemListStart
+        \resumeItem{Placeholder; job-agent fills this section from bullets.yaml}
+      \resumeItemListEnd
+    % END:EXPERIENCE
+  \resumeSubHeadingListEnd
+
+\section{Projects}
+  \resumeSubHeadingListStart
+    % BEGIN:PROJECTS
+    % END:PROJECTS
+  \resumeSubHeadingListEnd
+
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     % BEGIN:SKILLS
+     \textbf{Languages}{: Python}
+     % END:SKILLS
+    }}
+ \end{itemize}
+
+\end{document}

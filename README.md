@@ -8,8 +8,8 @@ A personal job-application agent. Given a job posting URL or pasted text, it:
 4. **stops for human review** (it never clicks submit), and
 5. logs the application to a Google Sheet.
 
-> Status: under construction. Phase 0 (security scaffolding) is in place;
-> the pipeline is being built in phases.
+> Status: under construction. Done: security scaffolding (Phase 0) and the
+> resume pipeline (Phase 1). Next: Sheets tracker, form filler, multi-site support.
 
 ## Security model
 
@@ -46,6 +46,42 @@ uv run pytest               # includes redaction and PII-check tests
 
 Never paste keys into an issue, a chat, or a terminal command. Put them in
 `.env` in your editor.
+
+## Usage (resume pipeline)
+
+```bash
+uv run jobagent init      # creates ~/.jobagent/ (0700) with FAKE example files
+# replace ~/.jobagent/bullets.yaml and resume.tex with your own, then:
+uv run jobagent doctor    # checks setup; prints statuses only, never values
+uv run jobagent ingest    # embeds bullets.yaml into the Qdrant bullet bank
+uv run jobagent tailor --url https://example.com/jobs/123
+uv run jobagent tailor --file posting.txt     # or --file - to read stdin
+```
+
+The PDF lands in `~/.jobagent/output/<company>_<role>/`. If a run is
+interrupted, running the same command again resumes from the SQLite checkpoint
+(`--fresh` starts over).
+
+```
+parse_job -> retrieve_bullets -> tailor_resume -> compile_resume -> verify_one_page
+                                                       ^                  |
+                                                       +--- trim_resume <-+  (over one page)
+```
+
+- **parse_job**: Sonnet (or Gemini, if enabled) extracts title, company, skills
+  and domains. The posting is treated as untrusted data.
+- **retrieve_bullets**: embeds the posting with Ollama `nomic-embed-text` and
+  ranks your bullets in Qdrant. Qdrant stores only vectors and ids; the text
+  stays in `bullets.yaml`.
+- **tailor_resume**: Opus selects and orders bullets and skills. Code then
+  enforces the rules. Unknown ids are dropped, every job is kept, skills must
+  come from your vocabulary, and a rephrasing that adds a number, skill, tool
+  or LaTeX command is reverted to your original text.
+- **compile_resume**: replaces only the `% BEGIN:X` / `% END:X` blocks, checks
+  brace balance and `\resumeItem{...}` arguments, and runs `pdflatex` twice
+  with `-no-shell-escape`.
+- **verify_one_page**: `pdfinfo` page count. If it's over one page, the least
+  relevant bullet is dropped and the resume recompiled.
 
 ## License
 

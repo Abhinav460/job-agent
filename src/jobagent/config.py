@@ -68,6 +68,13 @@ class Settings(BaseSettings):
     jobagent_owner_email: SecretStr | None = None
     jobagent_owner_phone: SecretStr | None = None
 
+    # Resume tailoring
+    resume_allow_rephrase: bool = True
+    resume_max_bullets_per_entry: int = 4
+    resume_max_projects: int = 3
+    resume_retrieval_top_k: int = 30
+    resume_max_trim_attempts: int = 8
+
     log_level: str = "INFO"
 
     @field_validator("jobagent_home", "google_service_account_file", mode="after")

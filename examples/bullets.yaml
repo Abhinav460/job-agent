@@ -1,0 +1,67 @@
+# FAKE fixture. Copy to $JOBAGENT_HOME/bullets.yaml (jobagent init does this)
+# and replace everything with your own real bullets.
+#
+# This file is the ONLY source of resume content. The writer can select,
+# reorder and lightly rephrase these bullets. It can never add a skill, tool,
+# number, date or employer that isn't written here.
+#
+# Text is LaTeX: escape % & $ # _ as \% \& \$ \# \_.
+# domains: any of IT, SWE, data, ML (used to rank bullets for a posting).
+# ids must be unique across the whole file.
+
+skills:
+  Languages: [Python, SQL, TypeScript, Bash]
+  Frameworks: [FastAPI, React, PyTorch, pandas]
+  Tools: [Docker, Git, PostgreSQL, Linux, Tableau]
+
+experience:
+  - id: example-corp
+    org: Example Corp
+    title: Software Engineering Intern
+    location: Springfield, USA
+    dates: Jun 2025 -- Aug 2025
+    bullets:
+      - id: ec-api
+        text: Built a FastAPI service that validated 40k daily sensor uploads, cutting bad records by 35\%
+        domains: [SWE, data]
+      - id: ec-ci
+        text: Containerized three legacy services with Docker and added CI checks, halving deploy time
+        domains: [SWE, IT]
+      - id: ec-dash
+        text: Wrote SQL views and a Tableau dashboard used by the operations team for weekly planning
+        domains: [data]
+
+  - id: fictional-university-helpdesk
+    org: Fictional University IT Help Desk
+    title: Student Technician
+    location: Springfield, USA
+    dates: Sep 2023 -- May 2025
+    bullets:
+      - id: fu-tickets
+        text: Resolved 25+ tickets a week across Linux and Windows labs with a 96\% satisfaction score
+        domains: [IT]
+      - id: fu-script
+        text: Automated lab image checks with a Bash script, saving about 6 technician hours a week
+        domains: [IT, SWE]
+
+projects:
+  - id: proj-recommender
+    name: Toy Movie Recommender
+    tech: Python, PyTorch
+    dates: Spring 2025
+    bullets:
+      - id: pr-model
+        text: Trained a matrix-factorization model in PyTorch on a public ratings dataset, reaching 0.89 RMSE
+        domains: [ML, data]
+      - id: pr-eval
+        text: Built an offline evaluation harness with pandas to compare 4 model variants
+        domains: [ML, data]
+
+  - id: proj-tracker
+    name: Habit Tracker Web App
+    tech: TypeScript, React, PostgreSQL
+    dates: Fall 2024
+    bullets:
+      - id: pt-app
+        text: Shipped a React and PostgreSQL habit tracker with auth and daily reminders
+        domains: [SWE]
