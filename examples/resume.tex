@@ -7,8 +7,8 @@
 %
 % Uses the same conventions job-agent expects from a real template:
 %   - extarticle at 9pt, lmodern, fontawesome5 icons
-%   - every bullet written as \resumeItem{\justify{text}}, with \justify
-%     redefined below; the renderer detects this wrapper and keeps it.
+%   - every bullet written as \resumeItem{\justify{text}} (ragged2e); the
+%     renderer detects this wrapper in your template and keeps it.
 %
 % job-agent only replaces text between the marker comments below:
 %   % BEGIN:EXPERIENCE / % END:EXPERIENCE   (required)
@@ -23,10 +23,6 @@
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{ragged2e}
-% ragged2e's \justify starts a `justify' environment (an unclosed list) and
-% breaks \resumeItem. Make \justify{text} a one-argument command instead; the
-% \par ends the paragraph while \justifying is still in effect.
-\renewcommand{\justify}[1]{\justifying #1\par}
 \usepackage{fontawesome5}
 \usepackage[empty]{fullpage}
 \usepackage{titlesec}
@@ -119,6 +115,11 @@
 \section{Projects}
   \resumeSubHeadingListStart
     % BEGIN:PROJECTS
+    \resumeProjectHeading
+      {\textbf{Example Project} $|$ \emph{Python}}{2025}
+      \resumeItemListStart
+        \resumeItem{\justify{Placeholder; job-agent fills this section from bullets.yaml}}
+      \resumeItemListEnd
     % END:PROJECTS
   \resumeSubHeadingListEnd
 
