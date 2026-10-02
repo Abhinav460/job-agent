@@ -164,21 +164,56 @@ def sanitize(
     return {"experience": experience, "projects": projects, "skills": skills}, rejected
 
 
+# Trimming never takes a job or project below this many bullets.
+MIN_BULLETS_PER_ENTRY = 2
+
+
 def trim(selection: dict[str, Any]) -> bool:
-    """Drop the least relevant content to shorten the page. Returns False if nothing can go."""
+    """Drop the least relevant bullet from an entry that has more than the floor.
+
+    Never removes a job or project, and never takes one below
+    MIN_BULLETS_PER_ENTRY. Returns False when nothing more can go.
+    """
     candidates = [
-        (b["score"], section, entry, b)
+        (b["score"], entry, b)
         for section in ("experience", "projects")
         for entry in selection[section]
-        if len(entry["bullets"]) > 1
+        if len(entry["bullets"]) > MIN_BULLETS_PER_ENTRY
         for b in entry["bullets"]
     ]
-    if candidates:
-        _, section, entry, bullet = min(candidates, key=lambda c: c[0])
-        entry["bullets"].remove(bullet)
-        return True
-    if selection["projects"]:
-        weakest = min(selection["projects"], key=lambda e: max(b["score"] for b in e["bullets"]))
-        selection["projects"].remove(weakest)
-        return True
-    return False
+    if not candidates:
+        return False
+    _, entry, bullet = min(candidates, key=lambda c: c[0])
+    entry["bullets"].remove(bullet)
+    return True
+
+
+class UntraceableContent(ValueError):
+    pass
+
+
+def check_traceable(selection: dict[str, Any], bank: BulletBank, job: JobPosting) -> None:
+    """Last gate before LaTeX: every item must trace back to bullets.yaml.
+
+    sanitize() already guarantees this; this re-check guards against a future
+    code path that skips it (for example, a resumed checkpoint written by an
+    older version).
+    """
+    protected = bank.skill_terms() + job.required_skills + job.preferred_skills + job.keywords
+    sections = {"experience": {e.id for e in bank.experience}, "projects": {p.id for p in bank.projects}}
+    for section, allowed in sections.items():
+        for chosen in selection[section]:
+            entry = bank.entry(chosen["entry_id"])
+            if chosen["entry_id"] not in allowed or entry is None:
+                raise UntraceableContent(f"unknown {section} entry {chosen['entry_id']!r}")
+            sources = {b.id: b.text for b in entry.bullets}
+            for b in chosen["bullets"]:
+                source = sources.get(b["bullet_id"])
+                if source is None:
+                    raise UntraceableContent(f"bullet {b['bullet_id']!r} is not in entry {entry.id!r}")
+                if b["text"] != source and rephrase_problem(source, b["text"], protected):
+                    raise UntraceableContent(f"bullet {b['bullet_id']!r} text does not trace to bullets.yaml")
+    for category, items in selection["skills"]:
+        vocabulary = bank.skills.get(category)
+        if vocabulary is None or any(item not in vocabulary for item in items):
+            raise UntraceableContent(f"skills line {category!r} has items outside bullets.yaml")

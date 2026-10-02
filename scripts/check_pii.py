@@ -3,7 +3,10 @@
 
 Fails if a file:
   * contains an email address, a phone number, or a PEM private key block,
-    unless the match is covered by .pii-allowlist; or
+    unless the match is covered by .pii-allowlist;
+  * contains the owner's own name, email, or phone (JOBAGENT_OWNER_NAME /
+    _EMAIL / _PHONE, read from the environment or .env), which the generic
+    patterns can miss (a name, or an unformatted number); or
   * has a path that must never be tracked (.env, secrets/, *.pdf, *.sqlite,
     key files, ...), even if it was force-added past .gitignore.
 
@@ -17,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -24,6 +28,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ALLOWLIST_FILE = REPO_ROOT / ".pii-allowlist"
+OWNER_VARS = ("JOBAGENT_OWNER_NAME", "JOBAGENT_OWNER_EMAIL", "JOBAGENT_OWNER_PHONE")
 
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 
@@ -67,6 +72,33 @@ def load_allowlist() -> list[re.Pattern[str]]:
     return patterns
 
 
+def read_owner_vars(dotenv: Path) -> dict[str, str]:
+    """OWNER_VARS from .env, overridden by the environment. Other keys are skipped."""
+    values: dict[str, str] = {}
+    if dotenv.is_file():
+        for raw in dotenv.read_text(encoding="utf-8", errors="replace").splitlines():
+            key, sep, value = raw.strip().partition("=")
+            if sep and key.strip() in OWNER_VARS:
+                values[key.strip()] = value.strip().strip("'\"")
+    values.update({k: os.environ[k] for k in OWNER_VARS if os.environ.get(k)})
+    return values
+
+
+def owner_patterns(values: dict[str, str]) -> list[tuple[re.Pattern[str], str]]:
+    patterns = []
+    if name := values.get("JOBAGENT_OWNER_NAME", "").strip():
+        # The full name and each part of 3+ letters (a surname on its own).
+        parts = sorted({name, *(p for p in name.split() if len(p) >= 3)}, key=len, reverse=True)
+        alternation = "|".join(re.escape(p) for p in parts)
+        patterns.append((re.compile(rf"(?<![A-Za-z])(?:{alternation})(?![A-Za-z])", re.I), "owner name"))
+    if email := values.get("JOBAGENT_OWNER_EMAIL", "").strip():
+        patterns.append((re.compile(re.escape(email), re.I), "owner email"))
+    if digits := re.sub(r"\D", "", values.get("JOBAGENT_OWNER_PHONE", ""))[-10:]:
+        # Any formatting: 9735550123, (973) 555-0123, +1 973 555 0123, ...
+        patterns.append((re.compile(r"(?<!\d)" + r"[\s().-]*".join(digits) + r"(?!\d)"), "owner phone"))
+    return patterns
+
+
 def path_problem(rel: str) -> str | None:
     for pattern, kind in FORBIDDEN_PATHS:
         if pattern.search(rel):
@@ -78,7 +110,11 @@ def path_problem(rel: str) -> str | None:
     return None
 
 
-def content_problems(path: Path, allowlist: list[re.Pattern[str]]) -> list[tuple[int, str]]:
+def content_problems(
+    path: Path,
+    allowlist: list[re.Pattern[str]],
+    owner: list[tuple[re.Pattern[str], str]] = (),
+) -> list[tuple[int, str]]:
     try:
         raw = path.read_bytes()
     except OSError:
@@ -91,6 +127,9 @@ def content_problems(path: Path, allowlist: list[re.Pattern[str]]) -> list[tuple
     for lineno, line in enumerate(text.splitlines(), start=1):
         if PRIVATE_KEY.search(line):
             problems.append((lineno, "private key"))
+        for pattern, kind in owner:
+            if pattern.search(line):
+                problems.append((lineno, kind))
         for kind, pattern in (("email address", EMAIL), ("phone number", PHONE)):
             for match in pattern.finditer(line):
                 found = match.group(0)
@@ -111,6 +150,7 @@ def tracked_files() -> list[str]:
 def main(argv: list[str]) -> int:
     files = tracked_files() if argv == ["--all"] else argv
     allowlist = load_allowlist()
+    owner = owner_patterns(read_owner_vars(REPO_ROOT / ".env"))
     failures = 0
 
     for name in files:
@@ -127,7 +167,7 @@ def main(argv: list[str]) -> int:
         if kind and not rel.startswith(".git/"):
             print(f"{rel}: forbidden path ({kind})")
             failures += 1
-        for lineno, kind in content_problems(abs_path, allowlist):
+        for lineno, kind in content_problems(abs_path, allowlist, owner):
             print(f"{rel}:{lineno}: possible {kind}")
             failures += 1
 

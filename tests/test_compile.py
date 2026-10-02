@@ -30,3 +30,15 @@ def test_shell_escape_is_blocked(tmp_path):
     )
     compile_tex(tex)
     assert not marker.exists()
+
+
+def test_spilled_sections_logic():
+    from jobagent.compile import spilled_sections
+
+    titles = ["Education", "Experience", "Projects", "Technical Skills"]
+    # Page 2 starts mid-Projects, then Skills begins.
+    assert spilled_sections("  more project text\nTECHNICAL SKILLS\nPython", titles) == ["Projects", "Technical Skills"]
+    # Page 2 starts exactly at a heading.
+    assert spilled_sections("Projects\nbullet", titles) == ["Projects", "Technical Skills"]
+    # No heading on page 2: the last section continues.
+    assert spilled_sections("just a trailing line", titles) == ["Technical Skills"]

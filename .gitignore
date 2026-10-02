@@ -14,6 +14,8 @@ secrets/
 *.key
 *.p12
 *.pfx
+id_rsa*
+id_ed25519*
 
 # JSON is ignored by default because service-account keys are JSON.
 # Tracked JSON files must be explicitly un-ignored here.
@@ -21,6 +23,7 @@ secrets/
 !.claude/settings.json
 
 # --- Personal data ---
+.jobagent/
 private/
 data/
 output/
@@ -57,9 +60,12 @@ profile.yaml
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+htmlcov/
 build/
 dist/
 *.egg-info/
@@ -68,4 +74,5 @@ dist/
 .claude/settings.local.json
 .idea/
 .vscode/
+*.swp
 .DS_Store

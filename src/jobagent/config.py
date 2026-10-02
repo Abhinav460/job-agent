@@ -12,8 +12,10 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Env vars that turn on LangSmith/LangChain tracing. All are forced off unless
 # the user opts in with LANGSMITH_TRACING=true.
@@ -30,6 +32,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,  # a key pasted into the wrong variable must not be echoed
     )
 
     # Personal data directory, outside the repo.
@@ -73,7 +76,6 @@ class Settings(BaseSettings):
     resume_max_bullets_per_entry: int = 4
     resume_max_projects: int = 3
     resume_retrieval_top_k: int = 30
-    resume_max_trim_attempts: int = 8
 
     log_level: str = "INFO"
 
@@ -98,6 +100,13 @@ class Settings(BaseSettings):
         if value is None or not value.get_secret_value().strip():
             return None
         return value
+
+    @model_validator(mode="after")
+    def _home_outside_repo(self) -> Settings:
+        home = self.jobagent_home.resolve()
+        if home == REPO_ROOT or REPO_ROOT in home.parents:
+            raise ValueError("JOBAGENT_HOME must be outside the repository (it holds personal data)")
+        return self
 
     def __repr__(self) -> str:
         return "Settings(<redacted>)"

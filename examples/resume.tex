@@ -5,6 +5,11 @@
 % Based on Jake Gutierrez's resume template (MIT license):
 % https://github.com/jakegut/resume
 %
+% Uses the same conventions job-agent expects from a real template:
+%   - extarticle at 9pt, lmodern, fontawesome5 icons
+%   - every bullet written as \resumeItem{\justify{text}} (ragged2e); the
+%     renderer detects this wrapper in your template and keeps it.
+%
 % job-agent only replaces text between the marker comments below:
 %   % BEGIN:EXPERIENCE / % END:EXPERIENCE   (required)
 %   % BEGIN:PROJECTS   / % END:PROJECTS     (optional)
@@ -12,9 +17,13 @@
 % Everything else (header, education, styling) is yours and is never touched.
 %-------------------------
 
-\documentclass[letterpaper,11pt]{article}
+\documentclass[letterpaper,9pt]{extarticle}
 
 \usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{ragged2e}
+\usepackage{fontawesome5}
 \usepackage[empty]{fullpage}
 \usepackage{titlesec}
 \usepackage{marvosym}
@@ -79,8 +88,9 @@
 
 \begin{center}
     \textbf{\Huge \scshape Testy McTestface} \\ \vspace{1pt}
-    \small (555) 555-0142 $|$ \href{mailto:testy.mctestface@example.com}{\underline{testy.mctestface@example.com}} $|$
-    \href{https://example.com}{\underline{example.com}}
+    \small \faPhone\ (555) 555-0142 $|$
+    \faEnvelope\ \href{mailto:testy.mctestface@example.com}{\underline{testy.mctestface@example.com}} $|$
+    \faGlobe\ \href{https://example.com}{\underline{example.com}}
 \end{center}
 
 \section{Education}
@@ -97,7 +107,7 @@
       {Software Engineering Intern}{Jun 2025 -- Aug 2025}
       {Example Corp}{Springfield, USA}
       \resumeItemListStart
-        \resumeItem{Placeholder; job-agent fills this section from bullets.yaml}
+        \resumeItem{\justify{Placeholder; job-agent fills this section from bullets.yaml}}
       \resumeItemListEnd
     % END:EXPERIENCE
   \resumeSubHeadingListEnd

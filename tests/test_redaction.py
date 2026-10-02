@@ -13,9 +13,17 @@ LANGSMITH = "lsv2_" + "pt_" + "0123abcd" * 4 + "_" + "0123456789"
 PEM = "-----BEGIN " + "PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END " + "PRIVATE KEY-----"
 EMAIL = "someone.real" + "@" + "gmail.com"
 PHONE = "(973) 555-" + "8812"
+TAILSCALE = "tskey-" + "auth-" + "kQ7x2" * 4
+JWT = "ey" + "J" + "hbGciOiJIUzI1" + "." + "eyJzdWIiOiIxMjM0" + "." + "SflKxwRJSMeKKF2Q"
+TAILNET_HOST = "homebox" + ".tail1234" + ".ts.net"
+TAILNET_IP = "100." + "101.42.7"
 
 
-@pytest.mark.parametrize("secret", [ANTHROPIC, GOOGLE, LANGSMITH, PEM, EMAIL, PHONE])
+@pytest.mark.parametrize(
+    "secret", [ANTHROPIC, GOOGLE, LANGSMITH, PEM, EMAIL, PHONE, TAILSCALE, JWT, TAILNET_HOST, TAILNET_IP],
+    ids=["anthropic", "google", "langsmith", "pem", "email", "phone", "tailscale", "jwt",
+         "tailnet-host", "tailnet-ip"],  # keep fake values out of test ids
+)
 def test_patterns(secret):
     out = Redactor()(f"before {secret} after")
     assert secret not in out
@@ -30,8 +38,9 @@ def test_url_query_key_and_bearer():
 
 
 def test_service_account_private_key_field():
-    out = Redactor()('{"type": "service_account", "private_key": "abc\\ndef"}')
-    assert "abc" not in out and '"type": "service_account"' in out
+    sa_type = '"type": "service' + '_account"'
+    out = Redactor()("{" + sa_type + ', "private_key": "abc\\ndef"}')
+    assert "abc" not in out and sa_type in out
 
 
 def test_literal_env_and_settings_values(tmp_path, monkeypatch):
@@ -78,3 +87,8 @@ def test_setup_logging_covers_third_party_loggers(tmp_path, monkeypatch, capsys)
     err = capsys.readouterr().err
     assert "not-a-pattern-just-a-value" not in err
     assert "[REDACTED]" in err
+
+
+def test_benign_text_untouched():
+    text = "compiled resume.pdf (1 page) in 2.3s on 2026-09-26, version 1.2.3, port 6333, 10.0.0.5"
+    assert Redactor()(text) == text

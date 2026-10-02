@@ -16,3 +16,21 @@ id = "google-oauth-access-token"
 description = "Google OAuth access token"
 regex = '''\bya29\.[0-9A-Za-z_\-]{20,}'''
 keywords = ["ya29."]
+
+[[rules]]
+id = "tailscale-key"
+description = "Tailscale auth/API/client key"
+regex = '''tskey-(?:auth|api|client|scim|webhook)-[a-zA-Z0-9-]{10,}'''
+keywords = ["tskey-"]
+
+[[rules]]
+id = "gcp-service-account-json"
+description = "Google service-account key file contents"
+regex = '''"type"\s*:\s*"service_account"'''
+keywords = ["service_account"]
+# Commit 501ff3e had this pattern as a literal in a redaction test (fake data,
+# since rewritten by string concatenation). Allow only that commit and file.
+[[rules.allowlists]]
+condition = "AND"
+commits = ["501ff3e2de149b6ed8d6fa8035892dcf38d97819"]
+paths = ['''^tests/test_redaction\.py$''']

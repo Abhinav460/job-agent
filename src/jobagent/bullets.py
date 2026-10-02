@@ -14,9 +14,9 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from jobagent.latex import brace_problems
+from jobagent.latex import brace_problems, unwrap_justify
 
 Domain = Literal["IT", "SWE", "data", "ML"]
 Section = Literal["experience", "projects"]
@@ -30,6 +30,13 @@ class Bullet(_Strict):
     id: str
     text: str
     domains: list[Domain] = Field(min_length=1)
+
+    @field_validator("text")
+    @classmethod
+    def _unwrap(cls, text: str) -> str:
+        # Bullets pasted from the .tex may keep their \justify{...}; rendering
+        # re-adds it when the template uses it.
+        return unwrap_justify(text).strip()
 
 
 class ExperienceEntry(_Strict):

@@ -63,16 +63,55 @@ def test_rephrasing_disabled_uses_source():
     assert selection["experience"][0]["bullets"][0]["text"] == source and rejected == 0
 
 
-def test_trim_drops_least_relevant_then_projects():
+def _entry(eid, *scores):
+    return {"entry_id": eid, "bullets": [{"bullet_id": f"{eid}-{i}", "score": sc} for i, sc in enumerate(scores)]}
+
+
+def test_trim_never_goes_below_two_bullets_or_drops_an_entry():
     selection = {
-        "experience": [{"entry_id": "e", "bullets": [{"bullet_id": "a", "score": 0.9}, {"bullet_id": "b", "score": 0.1}]}],
-        "projects": [{"entry_id": "p", "bullets": [{"bullet_id": "c", "score": 0.5}]}],
+        "experience": [_entry("job", 0.9, 0.1, 0.5, 0.2)],
+        "projects": [_entry("proj", 0.05, 0.3)],  # already at the floor: untouchable
         "skills": [],
     }
-    assert trim(selection)
-    assert [b["bullet_id"] for b in selection["experience"][0]["bullets"]] == ["a"]
-    assert trim(selection) and selection["projects"] == []
+    assert trim(selection)  # drops job's 0.1 (proj's 0.05 is protected by the floor)
+    assert trim(selection)  # drops job's 0.2
+    assert [b["score"] for b in selection["experience"][0]["bullets"]] == [0.9, 0.5]
     assert not trim(selection)
+    assert len(selection["projects"]) == 1 and len(selection["projects"][0]["bullets"]) == 2
+
+
+def test_check_traceable_rejects_tampered_selection():
+    from jobagent.tailor import UntraceableContent, check_traceable
+
+    good = WriterOutput(
+        experience=[EntryChoice(entry_id="example-corp", bullets=[BulletChoice(bullet_id="ec-api", text="x")])],
+        projects=[],
+        skills=[SkillLine(category="Languages", items=["Python"])],
+    )
+    selection, _ = run(good)
+    check_traceable(selection, BANK, JOB)  # sanitized output passes
+
+    tampered = [
+        lambda s: s["experience"][0]["bullets"][0].update(text="Led 12 engineers at a Fortune 500 company"),
+        lambda s: s["experience"][0]["bullets"][0].update(bullet_id="invented"),
+        lambda s: s["experience"].append({"entry_id": "fake-job", "bullets": []}),
+        lambda s: s["skills"].append(["Languages", ["Rust"]]),
+    ]
+    for tamper in tampered:
+        broken, _ = run(good)
+        tamper(broken)
+        with pytest.raises(UntraceableContent):
+            check_traceable(broken, BANK, JOB)
+
+
+def test_bullets_pasted_with_justify_are_unwrapped(tmp_path):
+    f = tmp_path / "b.yaml"
+    f.write_text(
+        "experience:\n"
+        "  - id: x\n    org: O\n    title: T\n    dates: D\n"
+        "    bullets:\n      - {id: b1, text: '\\justify{Built a thing}', domains: [SWE]}\n"
+    )
+    assert load_bullets(f).ref("b1").bullet.text == "Built a thing"
 
 
 def test_bank_rejects_duplicate_ids(tmp_path):

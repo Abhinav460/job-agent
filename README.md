@@ -18,9 +18,9 @@ This repository is public. The code is shared; the data never is.
 | Rule | How it is enforced |
 | --- | --- |
 | No personal data in the repo | Resume, profile, bullets, keys, browser profile, checkpoints and PDFs live in `$JOBAGENT_HOME` (default `~/.jobagent/`), outside the tree. Only fake fixtures in `examples/` are tracked. |
-| No secrets in commits | `.gitignore`, a `gitleaks` pre-commit hook, and `scripts/check_pii.py`, which rejects emails, phone numbers, private keys and private file types (`.env`, `*.pdf`, `*.sqlite`, key JSON, ...) even if force-added. |
+| No secrets in commits | `.gitignore`, a `gitleaks` pre-commit hook, and `scripts/check_pii.py`, which rejects emails, phone numbers, private keys, your own name, email and phone (`JOBAGENT_OWNER_*`), and private file types (`.env`, `*.pdf`, `*.sqlite`, key JSON, ...) even if force-added. It checks commit messages too. |
 | No secrets in history | GitHub Actions runs gitleaks over the full history and the PII check on every push and PR. |
-| No secrets in logs or the terminal | Config is loaded with pydantic-settings as `SecretStr`, and config objects never print their values. A logging filter redacts key patterns (`sk-ant-`, `AIza`, `lsv2_`, `ya29.`, private keys, ...) and the value of every secret env var. |
+| No secrets in logs or the terminal | Config is loaded with pydantic-settings as `SecretStr`, and config objects never print their values. Validation errors never echo input. A logging filter redacts key patterns (`sk-ant-`, `AIza`, `lsv2_`, `ya29.`, `tskey-`, JWTs, private keys, ...), Tailscale hostnames and IPs, and the value of every secret env var. |
 | No tracing by default | LangSmith tracing is forced off unless `LANGSMITH_TRACING=true`, because traces contain personal data. |
 | Narrow LLM tools | No shell tool. File tools reject paths outside the working dirs, and subprocess calls use fixed argument lists. |
 | Human submits | The form filler never clicks submit or apply. On a CAPTCHA or login wall it stops and hands control back. |
@@ -33,8 +33,12 @@ not enough.
 
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/),
 [gitleaks](https://github.com/gitleaks/gitleaks), and
-[pre-commit](https://pre-commit.com/). Later phases also need TeX Live
-(`pdflatex`), poppler (`pdfinfo`), Qdrant, and Ollama.
+[pre-commit](https://pre-commit.com/), plus Qdrant and Ollama for the bullet
+bank. TeX Live and poppler for compiling (Debian/Ubuntu):
+
+```bash
+sudo apt install texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra lmodern poppler-utils
+```
 
 ```bash
 git clone <this repo> && cd job-agent
@@ -66,6 +70,8 @@ interrupted, running the same command again resumes from the SQLite checkpoint
 parse_job -> retrieve_bullets -> tailor_resume -> compile_resume -> verify_one_page
                                                        ^                  |
                                                        +--- trim_resume <-+  (over one page)
+                                                                  |
+                                                        report_overflow  (all entries at 2 bullets)
 ```
 
 - **parse_job**: Sonnet (or Gemini, if enabled) extracts title, company, skills
@@ -81,7 +87,15 @@ parse_job -> retrieve_bullets -> tailor_resume -> compile_resume -> verify_one_p
   brace balance and `\resumeItem{...}` arguments, and runs `pdflatex` twice
   with `-no-shell-escape`.
 - **verify_one_page**: `pdfinfo` page count. If it's over one page, the least
-  relevant bullet is dropped and the resume recompiled.
+  relevant bullet is dropped and the resume recompiled. A job or project never
+  loses its last 2 bullets. If it still doesn't fit, the run stops and names
+  the sections that run past page 1 (found with `pdftotext`).
+
+Template conventions: Jake's resume macros (`\resumeSubheading`,
+`\resumeItem`, `\resumeProjectHeading`). Bullets may be written as
+`\resumeItem{\justify{text}}`: the checks accept exactly one `\justify{...}`
+wrapping the whole bullet, and generated bullets keep the wrapper when your
+template uses it. `examples/resume.tex` (extarticle, 9pt) shows the pattern.
 
 ## License
 

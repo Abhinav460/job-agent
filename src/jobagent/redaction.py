@@ -6,8 +6,10 @@ rewrites each record before any handler formats it, so third-party loggers
 
 Redacted:
   * known credential formats (Anthropic, Google, LangSmith, GitHub, AWS,
-    OAuth bearer tokens, PEM private keys, service-account private_key fields);
+    Tailscale, JWTs, OAuth bearer tokens, PEM private keys, service-account
+    private_key fields);
   * email addresses and formatted phone numbers;
+  * Tailscale hostnames (*.ts.net) and tailnet IPs (100.64.0.0/10);
   * the literal value of every SecretStr setting (API keys, owner name/email/
     phone) and of every environment variable whose name looks secret.
 """
@@ -36,12 +38,17 @@ _PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}"), REDACTED),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), REDACTED),
     (re.compile(r"xox[abprs]-[A-Za-z0-9-]{10,}"), REDACTED),
+    (re.compile(r"tskey-[a-z]+-[A-Za-z0-9-]{10,}"), REDACTED),
+    (re.compile(r"\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"), REDACTED),  # JWT
     (re.compile(r"(?i)(authorization:?\s*[\"']?\s*bearer\s+)[^\s\"',}]+"), rf"\1{REDACTED}"),
     (re.compile(r"(?i)([?&](?:key|api_key|apikey|token|access_token)=)[^&\s\"']+"), rf"\1{REDACTED}"),
     (re.compile(r"(?i)((?:x-api-key|api[_-]?key|password|secret)[\"']?\s*[:=]\s*[\"']?)[^\s\"',}]+"), rf"\1{REDACTED}"),
     # Personal data.
     (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"), "[EMAIL]"),
     (re.compile(r"(?<![\w.])(?:\+?\d{1,3}[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![\w.]*\d)"), "[PHONE]"),
+    # Tailscale MagicDNS names and 100.64.0.0/10 addresses reveal the user's tailnet.
+    (re.compile(r"\b[\w-]+\.[\w-]+\.ts\.net\b"), "[TAILNET-HOST]"),
+    (re.compile(r"\b100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}\b"), "[TAILNET-IP]"),
 ]
 
 # Environment variable names whose values are always redacted.

@@ -1,8 +1,9 @@
 import os
 
 import pytest
+from pydantic import ValidationError
 
-from jobagent.config import Settings, apply_tracing_policy
+from jobagent.config import REPO_ROOT, Settings, apply_tracing_policy
 
 FAKE_KEY = "sk-ant-" + "api03-" + "x" * 40
 
@@ -52,3 +53,18 @@ def test_tracing_needs_opt_in_and_key(tmp_path, monkeypatch):
     monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
     apply_tracing_policy(Settings())
     assert os.environ["LANGSMITH_TRACING"] == "false"
+
+
+def test_validation_errors_do_not_echo_input(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GEMINI_ENABLED", FAKE_KEY)  # a key pasted into the wrong variable
+    with pytest.raises(ValidationError) as exc:
+        Settings()
+    assert FAKE_KEY not in str(exc.value)
+
+
+def test_home_inside_repo_is_rejected(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("JOBAGENT_HOME", str(REPO_ROOT / "private"))
+    with pytest.raises(ValidationError, match="outside the repository"):
+        Settings()

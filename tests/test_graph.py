@@ -60,6 +60,10 @@ class Fakes:
         pdf.write_bytes(b"%PDF-fake")
         return pdf
 
+    def overflow(self, pdf, titles):
+        self.overflow_titles = titles
+        return ["Projects", "Technical Skills"]
+
     def pages(self, pdf):
         return self.page_counts.pop(0) if len(self.page_counts) > 1 else self.page_counts[0]
 
@@ -74,6 +78,7 @@ def make_app(settings, fakes, checkpointer=None):
         write=fakes.write,
         compile=fakes.compile,
         pages=fakes.pages,
+        overflow=fakes.overflow,
     )
     return graph.build_graph(deps, checkpointer)
 
@@ -89,20 +94,36 @@ def test_pipeline_writes_only_inside_markers(settings):
     before = original.split("\\section{Experience}")[0]  # header, contact line, education
     after = original.rsplit("% END:SKILLS", 1)[1]
     assert tex.startswith(before) and tex.endswith(after)
-    assert r"\resumeItem{Built a FastAPI service" in tex
+    assert r"\resumeItem{\justify{Built a FastAPI service" in tex
     assert "Placeholder" not in tex
 
 
 def test_over_one_page_trims_until_it_fits(settings):
-    fakes = Fakes(page_counts=(2, 2, 1))
+    # The example bank has exactly one bullet above the 2-per-entry floor.
+    fakes = Fakes(page_counts=(2, 1))
     state = make_app(settings, fakes).invoke({"source_text": "posting text"})
-    assert state["pages"] == 1 and state["trims"] == 2 and fakes.calls["compile"] == 3
+    assert state["pages"] == 1 and state["trims"] == 1 and fakes.calls["compile"] == 2
 
 
-def test_gives_up_after_max_trims(settings):
-    settings.resume_max_trim_attempts = 2
-    state = make_app(settings, Fakes(page_counts=(2,))).invoke({"source_text": "posting text"})
-    assert "still 2 pages" in state["error"]
+def test_stops_and_reports_sections_when_nothing_left_to_trim(settings):
+    fakes = Fakes(page_counts=(2,))
+    state = make_app(settings, fakes).invoke({"source_text": "posting text"})
+    assert "over the page: Projects, Technical Skills" in state["error"]
+    assert state["overflow_sections"] == ["Projects", "Technical Skills"]
+    assert fakes.overflow_titles == ["Education", "Experience", "Projects", "Technical Skills"]
+    # Every job and project kept at least its last 2 bullets (or all it had).
+    for section in ("experience", "projects"):
+        for entry in state["selection"][section]:
+            original = len(BANK.entry(entry["entry_id"]).bullets)
+            assert len(entry["bullets"]) >= min(2, original)
+    assert len(state["selection"]["experience"]) == len(BANK.experience)
+
+
+def test_generated_bullets_keep_template_justify_wrapper(settings):
+    state = make_app(settings, Fakes()).invoke({"source_text": "posting text"})
+    tex = Path(state["tex_path"]).read_text()
+    body = tex.split("% BEGIN:EXPERIENCE")[-1].split("% END:EXPERIENCE")[0]
+    assert body.count(r"\resumeItem{\justify{") == body.count(r"\resumeItem{") > 0
 
 
 def test_checkpoint_survives_restart(settings):

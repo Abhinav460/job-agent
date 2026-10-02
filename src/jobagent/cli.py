@@ -19,6 +19,7 @@ from jobagent.redaction import setup_logging
 log = logging.getLogger("jobagent")
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
+TEX_PACKAGES = "texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra lmodern poppler-utils"
 HOME_SUBDIRS = ("secrets", "output", "checkpoints", "screenshots", "browser_profile")
 
 
@@ -68,8 +69,8 @@ def cmd_doctor(settings: Settings, _: argparse.Namespace) -> int:
         print(f"     markers found: {', '.join(sorted(present)) or 'none'}")
     else:
         report("resume.tex present", False)
-    for tool in ("pdflatex", "pdfinfo"):
-        report(f"{tool} on PATH", shutil.which(tool) is not None, "sudo apt install texlive-latex-extra poppler-utils")
+    for tool in ("pdflatex", "pdfinfo", "pdftotext"):
+        report(f"{tool} on PATH", shutil.which(tool) is not None, f"install: {TEX_PACKAGES}")
     report("ANTHROPIC_API_KEY set", settings.anthropic_api_key is not None, "add it to .env")
     if settings.gemini_enabled:
         report("GOOGLE_API_KEY set (Gemini enabled)", settings.google_api_key is not None)
@@ -139,6 +140,7 @@ def cmd_tailor(settings: Settings, args: argparse.Namespace) -> int:
         ),
         compile=lambda tex: tex_compile.compile_tex(tex, tex_inputs=settings.jobagent_home),
         pages=tex_compile.page_count,
+        overflow=tex_compile.overflow_sections,
     )
     checkpointer = graph.open_checkpointer(settings)
     app = graph.build_graph(deps, checkpointer)

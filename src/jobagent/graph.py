@@ -3,6 +3,8 @@
 parse_job -> retrieve_bullets -> tailor_resume -> compile_resume -> verify_one_page
                                                        ^                 |
                                                        +-- trim_resume <-+  (over one page)
+                                                               |
+                                                   report_overflow  (every entry at its last 2 bullets)
 
 State holds ids, scores and paths, not whole documents. The checkpoint
 database lives in $JOBAGENT_HOME/checkpoints/ (0600) because the state still
@@ -23,6 +25,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from jobagent import latex, safepaths, tailor
+from jobagent.compile import section_titles
 from jobagent.bank import ScoredBullet
 from jobagent.bullets import BulletBank
 from jobagent.config import Settings
@@ -43,6 +46,7 @@ class ResumeState(TypedDict, total=False):
     pdf_path: str
     pages: int
     trims: int
+    overflow_sections: list[str]
     error: str | None
 
 
@@ -58,6 +62,7 @@ class Deps:
     write: Callable[[JobPosting, BulletBank, dict[str, float]], tailor.WriterOutput]
     compile: Callable[[Path], Path]
     pages: Callable[[Path], int]
+    overflow: Callable[[Path, list[str]], list[str]]
 
 
 def build_graph(deps: Deps, checkpointer: Any = None) -> Any:
@@ -100,11 +105,13 @@ def build_graph(deps: Deps, checkpointer: Any = None) -> Any:
     def compile_resume(state: ResumeState) -> ResumeState:
         tex = safepaths.read_text(s.resume_tex, read_roots)
         sel = state["selection"]
+        tailor.check_traceable(sel, deps.bank, JobPosting(**state["job"]))
+        justify = latex.uses_justify(tex)
         experience = [(deps.bank.entry(e["entry_id"]), [b["text"] for b in e["bullets"]]) for e in sel["experience"]]
         projects = [(deps.bank.entry(e["entry_id"]), [b["text"] for b in e["bullets"]]) for e in sel["projects"]]
         sections = {
-            "EXPERIENCE": lambda pad: latex.render_experience(experience, pad),
-            "PROJECTS": lambda pad: latex.render_projects(projects, pad),
+            "EXPERIENCE": lambda pad: latex.render_experience(experience, pad, justify),
+            "PROJECTS": lambda pad: latex.render_projects(projects, pad, justify),
             "SKILLS": lambda pad: latex.render_skills([(c, i) for c, i in sel["skills"]], pad),
         }
         present = latex.markers_present(tex)
@@ -128,18 +135,20 @@ def build_graph(deps: Deps, checkpointer: Any = None) -> Any:
     def trim_resume(state: ResumeState) -> ResumeState:
         selection = state["selection"]
         if not tailor.trim(selection):
-            return {"error": "resume is over one page even with minimal content"}
+            return {"trims": state.get("trims", 0), "error": "overflow"}
         return {"selection": selection, "trims": state.get("trims", 0) + 1}
 
-    def after_verify(state: ResumeState) -> str:
-        if state["pages"] <= 1:
-            return END
-        if state.get("trims", 0) >= s.resume_max_trim_attempts:
-            return "give_up"
-        return "trim_resume"
-
-    def give_up(state: ResumeState) -> ResumeState:
-        return {"error": f"still {state['pages']} pages after {state.get('trims', 0)} trims"}
+    def report_overflow(state: ResumeState) -> ResumeState:
+        tex = safepaths.read_text(state["tex_path"], write_roots)
+        sections = deps.overflow(Path(state["pdf_path"]), section_titles(tex))
+        where = ", ".join(sections) if sections else "unknown sections"
+        return {
+            "overflow_sections": sections,
+            "error": (
+                f"still {state['pages']} pages with every job and project at its last "
+                f"{tailor.MIN_BULLETS_PER_ENTRY} bullets; over the page: {where}"
+            ),
+        }
 
     graph = StateGraph(ResumeState)
     graph.add_node("parse_job", parse_job)
@@ -148,17 +157,21 @@ def build_graph(deps: Deps, checkpointer: Any = None) -> Any:
     graph.add_node("compile_resume", compile_resume)
     graph.add_node("verify_one_page", verify_one_page)
     graph.add_node("trim_resume", trim_resume)
-    graph.add_node("give_up", give_up)
+    graph.add_node("report_overflow", report_overflow)
     graph.add_edge(START, "parse_job")
     graph.add_edge("parse_job", "retrieve_bullets")
     graph.add_edge("retrieve_bullets", "tailor_resume")
     graph.add_edge("tailor_resume", "compile_resume")
     graph.add_edge("compile_resume", "verify_one_page")
-    graph.add_conditional_edges("verify_one_page", after_verify, ["trim_resume", "give_up", END])
     graph.add_conditional_edges(
-        "trim_resume", lambda st: END if st.get("error") else "compile_resume", ["compile_resume", END]
+        "verify_one_page", lambda st: END if st["pages"] <= 1 else "trim_resume", ["trim_resume", END]
     )
-    graph.add_edge("give_up", END)
+    graph.add_conditional_edges(
+        "trim_resume",
+        lambda st: "report_overflow" if st.get("error") == "overflow" else "compile_resume",
+        ["compile_resume", "report_overflow"],
+    )
+    graph.add_edge("report_overflow", END)
     return graph.compile(checkpointer=checkpointer)
 
 
