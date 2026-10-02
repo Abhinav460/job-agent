@@ -19,7 +19,7 @@ def _latex_errors(log: Path) -> str:
     lines = log.read_text(errors="replace").splitlines() if log.exists() else []
     picked = []
     for i, line in enumerate(lines):
-        if line.startswith("!") or "not found" in line:
+        if line.startswith(("!", "l.")) or "not found" in line:
             picked += lines[i : i + 4]
     return "\n".join(picked) or "\n".join(lines[-20:])
 
