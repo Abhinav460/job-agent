@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from jobagent.compile import compile_tex, page_count
+from jobagent.compile import CompileError, compile_tex, page_count
 
 EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "resume.tex"
 
@@ -14,10 +14,24 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _latex_errors(log: Path) -> str:
+    """'!' error lines plus the next few lines of context from a pdflatex log."""
+    lines = log.read_text(errors="replace").splitlines() if log.exists() else []
+    picked = []
+    for i, line in enumerate(lines):
+        if line.startswith("!") or "not found" in line:
+            picked += lines[i : i + 4]
+    return "\n".join(picked) or "\n".join(lines[-20:])
+
+
 def test_example_compiles_to_one_page(tmp_path):
     tex = tmp_path / "resume.tex"
     shutil.copy(EXAMPLE, tex)
-    pdf = compile_tex(tex)
+    try:
+        pdf = compile_tex(tex)
+    except CompileError as exc:
+        # Safe to print here: the example is a fake fixture, unlike a real resume log.
+        pytest.fail(f"{exc}\n{_latex_errors(tex.with_suffix('.log'))}")
     assert page_count(pdf) == 1
 
 
