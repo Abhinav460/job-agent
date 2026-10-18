@@ -25,6 +25,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 
 from jobagent import latex, safepaths, tailor
+from jobagent.applications import application_id
 from jobagent.compile import section_titles
 from jobagent.bank import ScoredBullet
 from jobagent.bullets import BulletBank
@@ -74,7 +75,8 @@ def build_graph(deps: Deps, checkpointer: Any = None) -> Any:
         text = state.get("source_text") or deps.fetch(state["source_url"])
         parsed = deps.parse(text)
         job = JobPosting(**parsed.model_dump(), url=state.get("source_url"), description=text)
-        out = s.output_dir / f"{safepaths.slug(job.company)}_{safepaths.slug(job.title)}"
+        identifier = application_id(state.get("source_url"), state.get("source_text"))
+        out = s.output_dir / f"{safepaths.slug(job.company)}_{safepaths.slug(job.title)}_{identifier}"
         safepaths.ensure_private_dir(out, write_roots)
         log.info("parsed posting")
         return {"job": job.model_dump(), "output_dir": str(out), "trims": 0}
