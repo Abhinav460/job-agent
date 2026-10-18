@@ -20,6 +20,10 @@ dependencies = [
 [project.scripts]
 jobagent = "jobagent.cli:main"
 
+[project.optional-dependencies]
+tracker = ["google-auth[requests]>=2.0"]
+browser = ["playwright>=1.49"]
+
 [dependency-groups]
 dev = [
     "pytest>=8",

@@ -20,7 +20,7 @@ log = logging.getLogger("jobagent")
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 TEX_PACKAGES = "texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra lmodern poppler-utils"
-HOME_SUBDIRS = ("secrets", "output", "checkpoints", "screenshots", "browser_profile")
+HOME_SUBDIRS = ("secrets", "output", "checkpoints", "screenshots", "browser_profile", "captures")
 
 
 def _display(path: Path, settings: Settings) -> str:
@@ -119,7 +119,12 @@ def cmd_tailor(settings: Settings, args: argparse.Namespace) -> int:
     from jobagent.bullets import load_bullets
     from jobagent.llm import coordinator_llm, writer_llm
 
-    if args.file == "-":
+    if getattr(args, "capture", None):
+        from jobagent.capture import load_capture
+
+        posting = load_capture(settings.jobagent_home, args.capture)
+        source_url, source_text = posting.source_url, posting.source_text
+    elif args.file == "-":
         source_url, source_text = None, sys.stdin.read()
     elif args.file:
         source_url, source_text = None, Path(args.file).read_text(encoding="utf-8")
@@ -161,7 +166,80 @@ def cmd_tailor(settings: Settings, args: argparse.Namespace) -> int:
         print(f"  trimmed {state['trims']} least-relevant item(s) to fit one page")
     if state.get("rephrase_rejections"):
         print(f"  {state['rephrase_rejections']} rephrasing(s) added facts and were reverted to your original text")
+    from jobagent.applications import ApplicationStore
+
+    record = ApplicationStore(settings.jobagent_home).save_resume(
+        source_url=source_url, source_text=source_text,
+        company=state["job"]["company"], title=state["job"]["title"], pdf=pdf,
+    )
+    print(f"application saved: {record.id} ({record.status})")
     return 0
+
+
+def cmd_status(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.applications import ApplicationStore
+
+    store = ApplicationStore(settings.jobagent_home)
+    if args.set:
+        record = store.set_status(args.application, args.set, confirmed=args.confirm_submitted)
+    else:
+        record = store.get(args.application)
+    print(f"{record.id}: {record.status}")
+    return 0
+
+
+def cmd_capture(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.capture import CaptureError, capture_posting
+
+    if not sys.stdin.isatty():
+        raise CaptureError("capture requires an interactive terminal for selection confirmation")
+    print(capture_posting(args.url, settings))
+    return 0
+
+
+def cmd_track(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.applications import ApplicationStore
+    from jobagent.tracker import TrackerError, from_settings
+
+    store = ApplicationStore(settings.jobagent_home)
+    tracker = from_settings(settings, store)
+    identifiers = [args.application] if args.command == "track" else store.pending(tracker.target)
+    failed = 0
+    for identifier in identifiers:
+        try:
+            tracker.sync(identifier)
+            print(f"application synced: {identifier}")
+        except TrackerError:
+            failed += 1
+            print(f"application sync failed: {identifier}; local record retained")
+    print(f"Sheets sync: {len(identifiers) - failed} saved, {failed} failed")
+    return 1 if failed else 0
+
+
+def cmd_fill(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.applications import ApplicationStore
+    from jobagent.browser import BrowserError, run_headed
+    from jobagent.profile import load_profile
+
+    if not sys.stdin.isatty():
+        raise BrowserError("fill requires an interactive terminal for human review")
+    store = ApplicationStore(settings.jobagent_home)
+    record = store.get(args.application)
+    if record.status == "submitted":
+        raise BrowserError("application is already marked submitted")
+    profile = load_profile(settings.profile_file, settings.jobagent_home)
+
+    def reviewed(result):
+        store.set_status(record.id, result.status)
+        print(f"{record.id}: {result.status}; {result.filled} filled, {result.skipped} skipped ({result.reason})")
+
+    try:
+        result = run_headed(record.posting_url, profile,
+                            settings.jobagent_home / record.resume_path, settings, reviewed)
+    except BrowserError:
+        store.set_status(record.id, "blocked")
+        raise
+    return 0 if result.status == "review_needed" else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -175,12 +253,27 @@ def main(argv: list[str] | None = None) -> int:
     src = tailor_p.add_mutually_exclusive_group(required=True)
     src.add_argument("--url", help="public job posting URL")
     src.add_argument("--file", help="file with the posting text, or - for stdin")
+    src.add_argument("--capture", help="private cap-... posting selected with the capture command")
     tailor_p.add_argument("--fresh", action="store_true", help="ignore an unfinished run for this posting")
+    track_p = sub.add_parser("track", help="sync one local application to Google Sheets")
+    track_p.add_argument("--application", required=True, help="application ID printed by tailor")
+    sub.add_parser("sync", help="sync pending local application changes to Google Sheets")
+    capture_p = sub.add_parser("capture", help="save only manually selected job-description text from a browser")
+    capture_p.add_argument("--url", required=True, help="HTTPS posting URL without credentials")
+    fill_p = sub.add_parser("fill", help="fill supported job form fields and keep browser open for review")
+    fill_p.add_argument("--application", required=True)
+    status_p = sub.add_parser("status", help="show or change a local application status")
+    status_p.add_argument("--application", required=True)
+    status_p.add_argument("--set", choices=("resume_ready", "review_needed", "blocked", "submitted"))
+    status_p.add_argument("--confirm-submitted", action="store_true",
+                          help="confirm that you submitted this application yourself")
     args = parser.parse_args(argv)
 
     settings = get_settings()
     setup_logging(settings)
-    commands = {"init": cmd_init, "doctor": cmd_doctor, "ingest": cmd_ingest, "tailor": cmd_tailor}
+    commands = {"init": cmd_init, "doctor": cmd_doctor, "ingest": cmd_ingest, "tailor": cmd_tailor,
+                "track": cmd_track, "sync": cmd_track, "status": cmd_status, "fill": cmd_fill,
+                "capture": cmd_capture}
     try:
         return commands[args.command](settings, args)
     except Exception as exc:  # noqa: BLE001

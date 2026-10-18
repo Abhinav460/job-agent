@@ -148,6 +148,10 @@ class Settings(BaseSettings):
         return self.jobagent_home / "browser_profile"
 
     @property
+    def captures_dir(self) -> Path:
+        return self.jobagent_home / "captures"
+
+    @property
     def checkpoint_db(self) -> Path:
         return self.jobagent_home / "checkpoints" / "graph.sqlite"
 
