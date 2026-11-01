@@ -125,6 +125,27 @@ def test_lever_ambiguous_hidden_or_custom_fields_skip(private, fields):
     assert plan_lever_fields(fields, profile) == ([], len(fields))
 
 
+def test_lever_custom_answers_cannot_bypass_builtin_field_names():
+    profile = ApplicantProfile.model_validate({
+        "first_name": "Fake", "last_name": "Applicant", "email": "fake@example.invalid",
+        "answers": {"Email": "other@example.invalid", "Full name": "Other Person",
+                    "Available start date": "June 2027"},
+    })
+    fields = [field("", "Email", name="custom_email"),
+              field("", "Full name", name="custom_name"),
+              field("", "Available start date", name="start_date")]
+    actions, skipped = plan_lever_fields(fields, profile)
+    assert [(action.field_id, action.value) for action in actions] == [("start_date", "June 2027")]
+    assert skipped == 2
+
+    with pytest.raises(ValueError, match="unique"):
+        ApplicantProfile.model_validate({
+            "first_name": "Fake", "last_name": "Applicant", "email": "fake@example.invalid",
+            "answers": {"Available start date*": "June 2027",
+                        "Available start date": "July 2027"},
+        })
+
+
 @pytest.mark.parametrize("url", [
     LEVER_URL.replace("https://", "http://"), LEVER_URL.replace("jobs.lever.co", "jobs.lever.co.evil.invalid"),
     LEVER_URL.replace("jobs.lever.co", "fake-user" + "@" + "jobs.lever.co"),
@@ -340,11 +361,39 @@ def test_headed_context_survives_until_human_review(private, url, page_type):
     def review():
         assert "close" not in events
         events.append("human_review")
+    def handoff():
+        assert "guard_off" not in events
+        events.append("human_handoff")
+        return True
     settings = SimpleNamespace(jobagent_home=home, browser_profile_dir=home / "browser_profile")
     result = run_headed(url, profile, pdf, settings, lambda result: events.append(result.status),
-                        wait_for_review=review, playwright_factory=Playwright)
+                        wait_for_review=review, playwright_factory=Playwright,
+                        wait_for_handoff=handoff)
     assert result.status == "review_needed"
-    assert events == ["open", "guard_on", "review_needed", "guard_off", "human_review", "close", "exit"]
+    assert events == ["open", "guard_on", "review_needed", "human_handoff",
+                      "guard_off", "human_review", "close", "exit"]
+
+
+def test_headed_close_before_handoff_keeps_write_guard(private):
+    home, pdf, profile = private
+    events = []
+    page = FakePage()
+    class Context:
+        def route(self, *args): events.append("guard_on")
+        def unroute(self, *args): events.append("guard_off")
+        def new_page(self): return page
+        def close(self): events.append("close")
+    class Playwright:
+        chromium = SimpleNamespace(launch_persistent_context=lambda *args, **kwargs: Context())
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    settings = SimpleNamespace(jobagent_home=home, browser_profile_dir=home / "browser_profile")
+    result = run_headed(URL, profile, pdf, settings, lambda result: events.append(result.status),
+                        wait_for_handoff=lambda: False,
+                        wait_for_review=lambda: events.append("review"),
+                        playwright_factory=Playwright)
+    assert result.status == "review_needed"
+    assert events == ["guard_on", "review_needed", "close"]
 
 
 @pytest.mark.parametrize("requested, redirected", [
@@ -368,6 +417,7 @@ def test_headed_rejects_redirected_target(private, requested, redirected):
         def __exit__(self, *args): pass
     settings = SimpleNamespace(jobagent_home=home, browser_profile_dir=home / "browser_profile")
     result = run_headed(requested, profile, pdf, settings, results.append,
-                        wait_for_review=lambda: None, playwright_factory=Playwright)
+                        wait_for_review=lambda: None, wait_for_handoff=lambda: False,
+                        playwright_factory=Playwright)
     assert result.status == "blocked" and result.reason == "posting_changed"
     assert page.actions == [] and results == [result]

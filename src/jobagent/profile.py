@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import yaml
-from pydantic import BaseModel, ConfigDict, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from jobagent.safepaths import read_text
 
@@ -27,6 +27,7 @@ class ApplicantProfile(BaseModel):
     country: SecretStr | None = None
     linkedin: SecretStr | None = None
     website: SecretStr | None = None
+    answers: dict[str, SecretStr] = Field(default_factory=dict)
 
     @field_validator("first_name", "last_name", "email", "phone", "location", "country",
                      "linkedin", "website")
@@ -53,6 +54,23 @@ class ApplicantProfile(BaseModel):
             url = urlsplit(value.get_secret_value())
             if url.scheme not in ("https", "http") or not url.hostname or url.username or url.password:
                 raise ValueError("profile URLs must be public http(s) URLs")
+        return value
+
+    @field_validator("answers")
+    @classmethod
+    def valid_answers(cls, value: dict[str, SecretStr]):
+        if len(value) > 50:
+            raise ValueError("too many custom answers")
+        seen = set()
+        for label, answer in value.items():
+            normalized = " ".join(label.casefold().replace("*", "")
+                                  .replace("\u2731", "").strip().rstrip(":").split())
+            text = answer.get_secret_value().strip()
+            if (not normalized or len(normalized) > 150 or normalized in seen
+                    or any(ord(c) < 32 for c in label)
+                    or not text or len(text) > 1000 or any(ord(c) < 32 for c in text)):
+                raise ValueError("custom answers require unique, bounded single-line labels and values")
+            seen.add(normalized)
         return value
 
     def __repr__(self):

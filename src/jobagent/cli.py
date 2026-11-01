@@ -242,6 +242,34 @@ def cmd_fill(settings: Settings, args: argparse.Namespace) -> int:
     return 0 if result.status == "review_needed" else 1
 
 
+def cmd_portal(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.portal import serve
+
+    serve(settings, port=args.port, open_browser=True)
+    return 0
+
+
+def cmd_extension_server(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.extension_server import serve
+
+    serve(settings, port=args.port)
+    return 0
+
+
+def cmd_index_resumes(settings: Settings, args: argparse.Namespace) -> int:
+    if os.name == "nt":
+        raise RuntimeError("private resume indexing requires Linux or WSL until Windows ACL support exists")
+    from jobagent.context_index import ContextIndex
+    from jobagent.resume_catalog import index_directory
+
+    catalog = index_directory(Path(args.folder), recursive=args.recursive)
+    with ContextIndex(settings.jobagent_home) as context:
+        result = context.sync(catalog, prune=False)
+    print(f"private resume index: {result.indexed} indexed, {result.unchanged} unchanged, "
+          f"{result.deleted} removed, {result.skipped} skipped")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     os.umask(0o077)  # everything we create is private
     parser = argparse.ArgumentParser(prog="jobagent", description="Personal job-application agent")
@@ -262,6 +290,14 @@ def main(argv: list[str] | None = None) -> int:
     capture_p.add_argument("--url", required=True, help="HTTPS posting URL without credentials")
     fill_p = sub.add_parser("fill", help="fill supported job form fields and keep browser open for review")
     fill_p.add_argument("--application", required=True)
+    portal_p = sub.add_parser("portal", help="open a private local application workspace")
+    portal_p.add_argument("--port", type=int, default=0, help="loopback port (default: choose a free port)")
+    extension_p = sub.add_parser("extension-server", help="serve the private Chrome side panel API")
+    extension_p.add_argument("--port", type=int, default=0,
+                             help="loopback port (default: choose a free port)")
+    index_p = sub.add_parser("index-resumes", help="index private local resumes in embedded Qdrant")
+    index_p.add_argument("--folder", required=True, help="resume/CV folder outside the public repository")
+    index_p.add_argument("--recursive", action="store_true", help="include nested resume folders")
     status_p = sub.add_parser("status", help="show or change a local application status")
     status_p.add_argument("--application", required=True)
     status_p.add_argument("--set", choices=("resume_ready", "review_needed", "blocked", "submitted"))
@@ -273,7 +309,9 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(settings)
     commands = {"init": cmd_init, "doctor": cmd_doctor, "ingest": cmd_ingest, "tailor": cmd_tailor,
                 "track": cmd_track, "sync": cmd_track, "status": cmd_status, "fill": cmd_fill,
-                "capture": cmd_capture}
+                "capture": cmd_capture, "portal": cmd_portal,
+                "extension-server": cmd_extension_server,
+                "index-resumes": cmd_index_resumes}
     try:
         return commands[args.command](settings, args)
     except Exception as exc:  # noqa: BLE001

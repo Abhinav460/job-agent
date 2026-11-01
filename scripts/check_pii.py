@@ -56,7 +56,7 @@ FORBIDDEN_PATHS = [
     (re.compile(r"(^|/)\.langsmith(/|$)"), "LangSmith data"),
 ]
 # JSON is forbidden (service-account keys) except these files.
-JSON_ALLOWED = {".claude/settings.json"}
+JSON_ALLOWED = {".claude/settings.json", "extension/manifest.json"}
 # Real resume/profile/bullets files are only allowed as fake fixtures.
 FIXTURE_ONLY = re.compile(r"(\.tex|(^|/)bullets\.yaml|(^|/)profile\.yaml)$")
 
