@@ -39,6 +39,9 @@ tracks applications. It must never submit an application itself.
 - Added this shared handoff, pointers in `AGENTS.md` and `CLAUDE.md`, and a home
   project index so future assistants can find the current status.
 - Added a separate private context-saver repository for cross-project memory.
+- Reviewed the branch for private-data, browser, and external-write behavior.
+  The side panel now rejects overlong selected descriptions instead of silently
+  truncating them, and ignores stale connection restoration after a manual connect.
 
 ## Decisions and boundaries
 
@@ -61,6 +64,10 @@ tracks applications. It must never submit an application itself.
 - On 2026-11-01, the handoff files and README pointers were checked for
   existence and `git diff --check` passed. No code tests were rerun for these
   documentation-only changes.
+- On 2026-11-01, 91 focused offline tests passed across portal, extension API,
+  resume and context indexes, tracker, and browser code; `node --check` passed
+  for the side panel. A read-only branch review found no automatic submit path
+  or obvious private-data leak. Live side-panel behavior is still unverified.
 - A full Windows test run had 2 failures and 5 errors from POSIX permission and
   symlink assumptions and from placing test temp homes inside this public repo.
   Do not present the full suite as passing on Windows.
@@ -78,9 +85,9 @@ tracks applications. It must never submit an application itself.
 2. Smoke-test the dashboard and Chrome side panel with fictional profile,
    resume, posting, and local browser data. Confirm loopback connection and
    review handoff before live use.
-3. Review the pushed branch for correctness and private data, run the relevant
-   checks in the chosen runtime, then open a PR when ready. Do not assume the
-   branch has been merged into `main`.
+3. Review the draft PR and run live Chrome checks with fictional data in a
+   supported private runtime. Do not assume the branch has been merged into
+   `main`.
 4. Verify Sheets sync only with the user's own credentials and spreadsheet;
    continue conservative form-adapter work after the local workflow is usable.
 

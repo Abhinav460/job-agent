@@ -75,7 +75,9 @@ and tracks the application. It must never submit an application itself.
    suggestions for manual review; fuzzy matches never fill form answers.
    Resume indexing from separate CLI folder runs preserves prior entries.
    Live Chrome, WSL, and Google API behavior remain unverified. Native Windows
-   use requires private ACL support before it can be enabled.
+   use requires private ACL support before it can be enabled. The side panel
+   rejects selected descriptions over 30,000 characters so it cannot prepare
+   from silently truncated job requirements.
 
 Use a single Sol builder for a substantive milestone. Use Luna for bounded
 exploration or review, and Astra only for a demonstrated hard problem. The

@@ -1,5 +1,6 @@
 const storage = chrome.storage.session;
 let connection = null;
+let connectionVersion = 0;
 
 const byId = (id) => document.getElementById(id);
 const notice = (message) => { byId("notice").textContent = message; };
@@ -137,15 +138,19 @@ async function action(path, data) {
 }
 
 byId("connect").addEventListener("click", async () => {
+  const version = ++connectionVersion;
   try {
     connection = parseServerUrl(byId("server-url").value.trim());
     await refresh({reloadProfile: true});
+    if (version !== connectionVersion) return;
     await storage.set({jobAgentConnection: connection});
     byId("server-url").value = "";
     notice("Connected to the local Job Agent server.");
   } catch (error) {
-    connection = null;
-    notice(error.message);
+    if (version === connectionVersion) {
+      connection = null;
+      notice(error.message);
+    }
   }
 });
 
@@ -158,12 +163,16 @@ byId("use-selection").addEventListener("click", async () => {
       func: () => ({text: window.getSelection()?.toString() || "", url: location.href, title: document.title})
     });
     const selected = injection.result;
-    if (!selected.text.trim()) throw new Error("Select the job description on the page first.");
+    const description = selected.text.trim();
+    if (!description) throw new Error("Select the job description on the page first.");
+    if (description.length > 30000) {
+      throw new Error("Selected text exceeds 30,000 characters. Select a shorter job description.");
+    }
     const form = byId("prepare-form");
     form.elements.namedItem("url").value = selected.url;
-    form.elements.namedItem("description").value = selected.text.slice(0, 30000);
-    if (!form.elements.namedItem("title").value) {
-      form.elements.namedItem("title").value = selected.title.slice(0, 160);
+    form.elements.namedItem("description").value = description;
+    if (!form.elements.namedItem("title").value && selected.title.length <= 160) {
+      form.elements.namedItem("title").value = selected.title;
     }
     notice("Selected job text loaded. Check the company and role before preparing.");
   } catch (error) {
@@ -189,8 +198,16 @@ byId("handoff").addEventListener("click", () => action("handoff", {}));
 byId("close-review").addEventListener("click", () => action("close", {}));
 
 storage.get("jobAgentConnection").then(async ({jobAgentConnection}) => {
-  if (!jobAgentConnection) return;
+  if (!jobAgentConnection || connectionVersion !== 0) return;
+  const version = ++connectionVersion;
   connection = jobAgentConnection;
-  try { await refresh({reloadProfile: true}); notice("Connected to the local Job Agent server."); }
-  catch { connection = null; await storage.remove("jobAgentConnection"); }
+  try {
+    await refresh({reloadProfile: true});
+    if (version === connectionVersion) notice("Connected to the local Job Agent server.");
+  } catch {
+    if (version === connectionVersion) {
+      connection = null;
+      await storage.remove("jobAgentConnection");
+    }
+  }
 });
