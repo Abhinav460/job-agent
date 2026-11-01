@@ -14,12 +14,12 @@ tracks applications. It must never submit an application itself.
 ## Current state
 
 - Repository: `origin` (public GitHub repository; run `git remote -v` for URL).
-- Local branch: `codex/extension-autoapply-sheets`, pushed at `a92db88` on
-  2026-11-01. The working tree was clean immediately after that push.
+- Local branch: `codex/extension-autoapply-sheets`, pushed on 2026-11-01.
+  Feature commit `a92db88` and a subsequent handoff update `aab67c6` are on
+  the branch; verify `git log` for its current head.
 - GitHub `main` merged the previous workflow branch in `515e8cc`.
 - The dashboard, extension, private resume catalog, context notes, and tracker
-  changes are in that pushed branch. Check `git status` before further work;
-  this handoff update itself is a later local documentation change until pushed.
+  changes are in that pushed branch. Check `git status` before further work.
 - The original resume pipeline, application journal, conservative Greenhouse
   and Lever adapters, selection-only posting capture, and optional Sheets
   tracker exist. See `docs/DEVELOPMENT_PLAN.md` for detailed scope.
