@@ -14,16 +14,17 @@ tracks applications. It must never submit an application itself.
 ## Current state
 
 - Repository: `origin` (public GitHub repository; run `git remote -v` for URL).
-- Local branch: `codex/extension-autoapply-sheets`, based on `b5b7199`.
+- Local branch: `codex/extension-autoapply-sheets`, pushed at `a92db88` on
+  2026-11-01. The working tree was clean immediately after that push.
 - GitHub `main` merged the previous workflow branch in `515e8cc`.
 - The dashboard, extension, private resume catalog, context notes, and tracker
-  changes are **uncommitted local work** as of this update. Check `git status`
-  before changing or staging anything. No current changes were pushed.
+  changes are in that pushed branch. Check `git status` before further work;
+  this handoff update itself is a later local documentation change until pushed.
 - The original resume pipeline, application journal, conservative Greenhouse
   and Lever adapters, selection-only posting capture, and optional Sheets
   tracker exist. See `docs/DEVELOPMENT_PLAN.md` for detailed scope.
 
-## Recent local changes
+## Recent changes
 
 - Added `jobagent portal`, a loopback browser dashboard for profile facts,
   resume folders, application preparation, review controls, and tracker sync.
@@ -77,9 +78,9 @@ tracks applications. It must never submit an application itself.
 2. Smoke-test the dashboard and Chrome side panel with fictional profile,
    resume, posting, and local browser data. Confirm loopback connection and
    review handoff before live use.
-3. Review the full uncommitted diff for correctness and private data, run the
-   relevant checks in the chosen runtime, then decide whether to commit and
-   push the branch or open a PR. Do not assume the work is already on GitHub.
+3. Review the pushed branch for correctness and private data, run the relevant
+   checks in the chosen runtime, then open a PR when ready. Do not assume the
+   branch has been merged into `main`.
 4. Verify Sheets sync only with the user's own credentials and spreadsheet;
    continue conservative form-adapter work after the local workflow is usable.
 
