@@ -15,7 +15,8 @@ tracks applications. It must never submit an application itself.
 
 - Repository: `origin` (public GitHub repository; run `git remote -v` for URL).
 - Local branch: `codex/extension-autoapply-sheets`; verify `git log` and remote
-  tracking status for its current head.
+  tracking status for its current head. Windows ACL milestone `3c508c5` was
+  pushed on 2026-11-02. Draft PR: https://github.com/Abhinav460/job-agent/pull/2.
 - GitHub `main` merged the previous workflow branch in `515e8cc`.
 - The dashboard, extension, private resume catalog, context notes, and tracker
   changes are in that pushed branch. Check `git status` before further work.
@@ -91,8 +92,7 @@ tracks applications. It must never submit an application itself.
 1. Smoke-test the native Windows dashboard and Chrome side panel with fictional profile,
    resume, posting, and local browser data. Confirm loopback connection and
    review handoff before live use.
-2. Open/review a draft PR for this branch. Do not assume it has been merged into
-   `main`.
+2. Review draft PR #2. Do not assume it has been merged into `main`.
 3. Verify Sheets sync only with the user's own credentials and spreadsheet;
    continue conservative form-adapter work after the local workflow is usable.
 
