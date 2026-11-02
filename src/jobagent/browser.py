@@ -84,15 +84,29 @@ def plan_fields(fields: list[dict], profile: ApplicantProfile, pdf: Path):
     """Only exact labels map to private facts; duplicate/unknown fields are skipped."""
     identities = Counter(f.get("id", "") for f in fields)
     meanings = Counter(LABELS.get(normalized(f.get("label", ""))) for f in fields)
+    labels = Counter(normalized(f.get("label", "")) for f in fields)
+    custom = {normalized(label): value.get_secret_value()
+              for label, value in profile.answers.items()}
     actions, skipped = [], 0
     for field in fields:
         identifier = field.get("id", "")
         semantic = LABELS.get(normalized(field.get("label", "")))
         kind = field.get("type", "")
         if (not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", identifier)
-                or identities[identifier] != 1 or semantic is None or meanings[semantic] != 1
+                or identities[identifier] != 1
                 or field.get("disabled") or field.get("readonly")
                 or not field.get("interactable", True)):
+            skipped += 1
+            continue
+        if semantic is None:
+            label = normalized(field.get("label", ""))
+            if labels[label] == 1 and label in custom and kind in (
+                    "text", "email", "tel", "url", "textarea"):
+                actions.append(FillAction(identifier, "fill", custom[label]))
+            else:
+                skipped += 1
+            continue
+        if meanings[semantic] != 1:
             skipped += 1
             continue
         if semantic == "resume":
@@ -121,9 +135,11 @@ def plan_fields(fields: list[dict], profile: ApplicantProfile, pdf: Path):
 
 
 def plan_lever_fields(fields: list[dict], profile: ApplicantProfile):
-    """Name/email only, with both unique labels and expected form field names."""
+    """Known facts require exact labels; built-ins also require expected field names."""
     names = Counter(f.get("name", "") for f in fields)
     labels = Counter(normalized(f.get("label", "")) for f in fields)
+    custom = {normalized(label): value.get_secret_value()
+              for label, value in profile.answers.items()}
     actions, skipped = [], 0
     for field in fields:
         label = normalized(field.get("label", ""))
@@ -137,6 +153,10 @@ def plan_lever_fields(fields: list[dict], profile: ApplicantProfile):
             actions.append(FillAction(name, "fill", full_name, "name"))
         elif label == "email" and name == "email" and field.get("type") in ("text", "email"):
             actions.append(FillAction(name, "fill", profile.email.get_secret_value(), "name"))
+        elif (label in custom and label not in LABELS and label != "full name"
+              and re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name)
+              and field.get("type") in ("text", "email", "tel", "url", "textarea")):
+            actions.append(FillAction(name, "fill", custom[label], "name"))
         else:
             skipped += 1
     return actions, skipped
@@ -236,7 +256,7 @@ def prevent_automatic_writes(route):
 
 
 def run_headed(url: str, profile: ApplicantProfile, pdf: Path, settings, on_result,
-               wait_for_review=None, playwright_factory=None) -> FillResult:
+               wait_for_review=None, playwright_factory=None, wait_for_handoff=None) -> FillResult:
     if not supported_url(url):
         result = FillResult("blocked", reason="unsupported_url")
         on_result(result)
@@ -249,6 +269,9 @@ def run_headed(url: str, profile: ApplicantProfile, pdf: Path, settings, on_resu
             raise BrowserError("install browser dependencies and Chromium before filling") from None
     if wait_for_review is None:
         wait_for_review = lambda: input("Review the browser. Press Enter here when finished to close it: ")
+    if wait_for_handoff is None:
+        wait_for_handoff = lambda: input(
+            "Automatic filling is finished. Press Enter to enable manual browser actions: ") is not None
     directory = safepaths.ensure_private_dir(settings.browser_profile_dir, [settings.jobagent_home])
     try:
         with playwright_factory() as playwright:
@@ -266,10 +289,12 @@ def run_headed(url: str, profile: ApplicantProfile, pdf: Path, settings, on_resu
                 except Exception:
                     result = FillResult("blocked", reason="browser_or_navigation_failed")
                 on_result(result)
-                context.unroute("**/*", prevent_automatic_writes)
-                # This wait is inside the browser lifetime, including blocked
-                # pages, so a human can inspect and complete the form themselves.
-                wait_for_review()
+                # Keep blocking writes triggered by automatic fills until the
+                # human explicitly takes control. Closing before handoff keeps
+                # the guard in place for the entire browser lifetime.
+                if wait_for_handoff():
+                    context.unroute("**/*", prevent_automatic_writes)
+                    wait_for_review()
                 return result
             finally:
                 context.close()

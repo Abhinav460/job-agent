@@ -21,6 +21,7 @@ id_ed25519*
 # Tracked JSON files must be explicitly un-ignored here.
 *.json
 !.claude/settings.json
+!extension/manifest.json
 
 # --- Personal data ---
 .jobagent/
@@ -62,6 +63,7 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.pytest_*/
 .ruff_cache/
 .mypy_cache/
 .coverage

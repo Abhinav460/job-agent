@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from jobagent.config import Settings, get_settings
+from jobagent.private_storage import secure_home
 from jobagent.redaction import setup_logging
 
 log = logging.getLogger("jobagent")
@@ -33,6 +34,7 @@ def _display(path: Path, settings: Settings) -> str:
 
 def cmd_init(settings: Settings, _: argparse.Namespace) -> int:
     home = settings.jobagent_home
+    secure_home(home, force=True)
     home.mkdir(mode=0o700, parents=True, exist_ok=True)
     home.chmod(0o700)
     for sub in HOME_SUBDIRS:
@@ -61,7 +63,14 @@ def cmd_doctor(settings: Settings, _: argparse.Namespace) -> int:
     home = settings.jobagent_home
     report("JOBAGENT_HOME exists", home.is_dir(), "run: jobagent init")
     if home.is_dir():
-        report("JOBAGENT_HOME is private (0700)", home.stat().st_mode & 0o077 == 0, "chmod 700")
+        if os.name == "nt":
+            try:
+                secure_home(home, force=True)
+                report("JOBAGENT_HOME ACL repaired and verified", True)
+            except Exception:
+                report("JOBAGENT_HOME ACL repaired and verified", False, "check NTFS permissions")
+        else:
+            report("JOBAGENT_HOME is private (0700)", home.stat().st_mode & 0o077 == 0, "chmod 700")
     report("bullets.yaml present", settings.bullets_file.is_file())
     if settings.resume_tex.is_file():
         present = latex.markers_present(settings.resume_tex.read_text(encoding="utf-8"))
@@ -242,6 +251,33 @@ def cmd_fill(settings: Settings, args: argparse.Namespace) -> int:
     return 0 if result.status == "review_needed" else 1
 
 
+def cmd_portal(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.portal import serve
+
+    serve(settings, port=args.port, open_browser=True)
+    return 0
+
+
+def cmd_extension_server(settings: Settings, args: argparse.Namespace) -> int:
+    from jobagent.extension_server import serve
+
+    serve(settings, port=args.port)
+    return 0
+
+
+def cmd_index_resumes(settings: Settings, args: argparse.Namespace) -> int:
+    secure_home(settings.jobagent_home, force=True)
+    from jobagent.context_index import ContextIndex
+    from jobagent.resume_catalog import index_directory
+
+    catalog = index_directory(Path(args.folder), recursive=args.recursive)
+    with ContextIndex(settings.jobagent_home) as context:
+        result = context.sync(catalog, prune=False)
+    print(f"private resume index: {result.indexed} indexed, {result.unchanged} unchanged, "
+          f"{result.deleted} removed, {result.skipped} skipped")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     os.umask(0o077)  # everything we create is private
     parser = argparse.ArgumentParser(prog="jobagent", description="Personal job-application agent")
@@ -262,6 +298,14 @@ def main(argv: list[str] | None = None) -> int:
     capture_p.add_argument("--url", required=True, help="HTTPS posting URL without credentials")
     fill_p = sub.add_parser("fill", help="fill supported job form fields and keep browser open for review")
     fill_p.add_argument("--application", required=True)
+    portal_p = sub.add_parser("portal", help="open a private local application workspace")
+    portal_p.add_argument("--port", type=int, default=0, help="loopback port (default: choose a free port)")
+    extension_p = sub.add_parser("extension-server", help="serve the private Chrome side panel API")
+    extension_p.add_argument("--port", type=int, default=0,
+                             help="loopback port (default: choose a free port)")
+    index_p = sub.add_parser("index-resumes", help="index private local resumes in embedded Qdrant")
+    index_p.add_argument("--folder", required=True, help="resume/CV folder outside the public repository")
+    index_p.add_argument("--recursive", action="store_true", help="include nested resume folders")
     status_p = sub.add_parser("status", help="show or change a local application status")
     status_p.add_argument("--application", required=True)
     status_p.add_argument("--set", choices=("resume_ready", "review_needed", "blocked", "submitted"))
@@ -273,8 +317,12 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(settings)
     commands = {"init": cmd_init, "doctor": cmd_doctor, "ingest": cmd_ingest, "tailor": cmd_tailor,
                 "track": cmd_track, "sync": cmd_track, "status": cmd_status, "fill": cmd_fill,
-                "capture": cmd_capture}
+                "capture": cmd_capture, "portal": cmd_portal,
+                "extension-server": cmd_extension_server,
+                "index-resumes": cmd_index_resumes}
     try:
+        if args.command not in {"init", "doctor", "portal", "extension-server", "index-resumes"}:
+            secure_home(settings.jobagent_home, force=True)
         return commands[args.command](settings, args)
     except Exception as exc:  # noqa: BLE001
         # Type and redacted message only; full traceback at DEBUG.

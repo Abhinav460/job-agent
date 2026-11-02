@@ -12,6 +12,8 @@ def local(tmp_path, monkeypatch):
     pdf = home / "output" / "resume.pdf"
     pdf.parent.mkdir(parents=True)
     pdf.write_bytes(b"fake resume")
+    from jobagent.private_storage import HOME_MARKER_NAME
+    (home / HOME_MARKER_NAME).write_text("jobagent-private-home-v1\n")
     store = ApplicationStore(home)
     record = store.save_resume(source_url="https://example.com/1", source_text=None,
                               company="Private Company", title="Private Role", pdf=pdf)

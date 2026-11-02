@@ -1,5 +1,10 @@
 # Job Agent coding instructions
 
+Read `C:\Users\banu_\context-saver\CONTEXT.md` for the shared cross-project
+handoff and `PROJECT_CONTEXT.md` for this project's details, then verify both
+against the working tree. Update both after meaningful changes so future
+assistants can see what changed, what was tested, and what remains.
+
 This public repository contains code and fake examples. Real resumes, profiles,
 browser sessions, credentials, checkpoints, and output belong in `JOBAGENT_HOME`
 outside the repository. Do not read or print `.env`, `JOBAGENT_HOME`, or other

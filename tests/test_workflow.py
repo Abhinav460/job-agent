@@ -135,6 +135,8 @@ def test_offline_application_workflow(tmp_path, monkeypatch, capsys, use_capture
     # Inject fake settings rather than loading the developer's environment.
     home = tmp_path / "fake-home"
     home.mkdir()
+    from jobagent.private_storage import HOME_MARKER_NAME
+    (home / HOME_MARKER_NAME).write_text("jobagent-private-home-v1\n")
     settings = SimpleNamespace(
         jobagent_home=home, output_dir=home / "output", resume_tex=home / "resume.tex",
         bullets_file=home / "bullets.yaml", profile_file=home / "profile.yaml",
@@ -216,13 +218,20 @@ def test_offline_application_workflow(tmp_path, monkeypatch, capsys, use_capture
         assert fake_browser.blocked_writes == 5
         events.append("human_review")
 
+    def human_handoff():
+        assert not fake_browser.closed and fake_browser.guard is not None
+        assert store.get(identifier).status == "review_needed"
+        events.append("human_handoff")
+        return True
+
     def headed(url, profile, pdf, settings, on_result):
         return actual_headed(url, profile, pdf, settings, on_result,
+                             wait_for_handoff=human_handoff,
                              wait_for_review=human_review, playwright_factory=lambda: fake_browser)
 
     monkeypatch.setattr(browser, "run_headed", headed)
     assert cli.main(["fill", "--application", identifier]) == 0
-    assert events.index("human_review") < events.index("browser_close")
+    assert events.index("human_handoff") < events.index("human_review") < events.index("browser_close")
     assert store.get(identifier).status == "review_needed"
 
     remote = FakeSheetsSession(events)

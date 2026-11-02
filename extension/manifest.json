@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Job Agent",
+  "version": "0.1.0",
+  "description": "Prepare and track job applications from a compact browser side panel.",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel", "activeTab", "scripting", "storage"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "action": {"default_title": "Open Job Agent"},
+  "side_panel": {"default_path": "panel.html"},
+  "background": {"service_worker": "background.js"}
+}

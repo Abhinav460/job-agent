@@ -41,6 +41,8 @@ class FakeBrowser:
 def settings(tmp_path):
     home = tmp_path / "fake-home"
     home.mkdir()
+    from jobagent.private_storage import HOME_MARKER_NAME
+    (home / HOME_MARKER_NAME).write_text("jobagent-private-home-v1\n")
     return SimpleNamespace(jobagent_home=home, browser_profile_dir=home / "browser_profile")
 
 

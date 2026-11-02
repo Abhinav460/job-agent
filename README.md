@@ -1,5 +1,7 @@
 # job-agent
 
+For current development status and next steps, see [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md).
+
 A personal job-application agent. Given a job posting URL or pasted text, it:
 
 1. parses the job description,
@@ -12,15 +14,20 @@ A personal job-application agent. Given a job posting URL or pasted text, it:
 > resume pipeline (Phase 1), local application journal and optional Sheets tracker.
 > Conservative Greenhouse and Lever form filling is implemented with offline tests.
 > Private selection-only posting capture is implemented with offline tests.
+> A local browser workspace can select the tracker spreadsheet and sync pending records.
+> The workspace can also index existing resumes, copy the best matching PDF, and save profile facts.
 > Next: additional form variants, site adapters and live verification.
 
 ## Security model
 
 This repository is public. The code is shared; the data never is.
 
-Use Linux or WSL for live private data until Windows ACL support is implemented.
-The current `0700`/`0600` directory and file controls use POSIX permissions;
-Windows `chmod` and `umask` do not establish equivalent private access controls.
+On Linux and WSL, private files use `0700`/`0600` permissions. On native Windows,
+commands repair and verify a current-user-only NTFS access control list on the
+private home and its existing contents before using them. New files inherit the
+private access rule. If protection fails, the command stops. Use a dedicated
+`JOBAGENT_HOME` outside the public repository. The default `~/.jobagent`
+location is recognized for migration.
 
 | Rule | How it is enforced |
 | --- | --- |
@@ -117,6 +124,110 @@ unexpected headers or duplicate IDs stop syncing. Runtime credentials and a
 live spreadsheet are required for live API verification; the automated tests
 exercise a fake service and request arguments offline.
 
+### Local application workspace
+
+Run the local browser workspace on Linux, WSL, or native Windows. On Windows,
+use an NTFS volume and a dedicated private home, such as `~/.jobagent`. The
+first run may take longer while Job Agent repairs and verifies existing file
+permissions. Reparse points and hard-linked files in that home stop startup;
+move those files out of the private home before trying again. An existing
+custom Windows home without Job Agent's private-home marker is rejected so a
+mistaken path cannot change unrelated files. WSL remains an option if you
+prefer a Linux runtime; keep its private home on the Linux filesystem.
+
+```bash
+uv sync --extra browser --extra tracker
+uv run playwright install chromium
+```
+
+Start the workspace:
+
+```bash
+uv run jobagent portal
+```
+
+The command opens the dashboard in your browser and also prints its loopback
+URL if automatic opening is unavailable. The URL contains a random access
+token; keep it private and close the portal when finished. Enter your verified
+profile facts, then add a folder of existing resumes outside this public repo.
+The portal extracts content from PDF, DOCX, ODT, and TXT files. PDF extraction
+uses `pypdf` (installed by default) or `pdftotext`; scanned or encrypted PDFs
+need a readable copy. Indexing and matching use local Qdrant and local text
+matching by default. The private index stores vectors, opaque IDs, and content
+digests; extracted text and file paths are not stored in Qdrant. You can also
+index a folder without opening the portal:
+
+```bash
+uv run jobagent index-resumes --folder /path/to/private/resumes
+```
+
+Running `index-resumes` for another folder keeps entries from earlier folders.
+The portal refreshes its index from all folders configured in the workspace.
+
+For **Prepare an application**, enter a company, role, posting URL, and job
+description. The portal ranks the content of existing resumes, copies the
+best matching readable PDF into the private output folder under a company name,
+and records the application. It preserves the original PDF bytes. This flow
+selects an existing resume; it does not rewrite or compile a tailored resume.
+Use `jobagent tailor` for the LaTeX tailoring pipeline. Review the selected PDF
+and every form field yourself before submission. Extra profile answers are
+filled only when an exact, unique question label matches a saved answer and the
+field is a supported text input. Never save an answer you cannot verify.
+
+For Google Sheets syncing, install the `tracker` extra and configure the
+private service-account key above. In **Tracker**, paste a Google
+Sheets spreadsheet ID or its `docs.google.com/spreadsheets/d/.../edit` URL and
+choose it. The choice is saved in `$JOBAGENT_HOME/tracker_config.json` and takes
+precedence over `GOOGLE_SHEET_ID` for the portal; the CLI still uses the
+environment setting. Each destination has separate pending-sync state. Use
+**Sync pending applications** or the per-application **Sync sheet** button.
+The page shows a short suffix of the selected ID and a pending count. Sync
+failures leave local records pending.
+
+The tracker instruction box accepts `use spreadsheet <ID or URL>`, `sync all`,
+`sync app-...`, and `show pending`. It accepts only these commands; it does not
+interpret arbitrary prose. The worksheet is named `Applications` and has the
+fixed columns documented above. The portal never submits applications and
+requires a separate click to record that you submitted one yourself.
+
+### Chrome side panel
+
+The optional side panel uses the same private local workspace. Run on Linux or
+WSL after installing the dependencies above:
+
+```bash
+uv run jobagent extension-server
+```
+
+Run either `portal` or `extension-server` at a time. Their embedded Qdrant
+indexes lock the private data directory while a server is open.
+
+In Chrome 116 or newer, open `chrome://extensions`, turn on Developer mode,
+choose **Load unpacked**, and select this repository's `extension/` directory.
+If the server checkout is in WSL, the matching `extension/` directory can be
+loaded from a Windows checkout of the same commit.
+Click the Job Agent icon to open the side panel. Paste the exact loopback URL
+printed by `extension-server` into **Connect**. The server URL contains a
+random token, stays in Chrome session storage, and expires when the server
+stops. The server accepts the first authenticated extension origin for that
+run and rejects website origins. Keep the URL private. The extension connects
+only to `127.0.0.1`.
+
+The panel can save verified profile facts, add a private resume folder, use
+selected job text from an HTTPS tab, prepare an application, choose a Google
+Sheet, sync records, and open a form for review. Browser review begins with
+manual actions paused. Click **Enable manual actions** only when ready to
+complete the form yourself. **Record submitted** requires a separate explicit
+confirmation after you have submitted the application. The agent never clicks
+Submit or Apply.
+
+Save reusable experience and answer context under **Reusable context notes**.
+Notes live in `$JOBAGENT_HOME/context_notes.json`; a private embedded Qdrant
+index stores local vectors and opaque IDs for retrieval. Search returns
+suggestions for you to inspect; it never fills a form from a fuzzy match.
+Resume matching uses a separate local Qdrant index. Both indexes work without
+a hosted vector database or embedding API.
+
 ### Browser filling and human review
 
 Install `uv sync --extra browser` and `uv run playwright install chromium`.
@@ -167,8 +278,9 @@ and public [form-label evidence](https://jobs.lever.co/reply/77d1b33a-b294-4fc0-
 Selectors are conservative; live compatibility remains unverified.
 
 During automatic filling it blocks network write requests; upload widgets that
-POST immediately may need manual completion. That guard is removed when control
-passes to you for review and manual submission. The journal records
+POST immediately may need manual completion. The guard stays active after
+filling until you explicitly enable manual actions in the terminal or portal.
+You can close the review browser without enabling them. The journal records
 `review_needed` or `blocked`; only your explicit status command can record
 `submitted`.
 

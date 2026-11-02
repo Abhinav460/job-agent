@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Agent</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header><h1>Job Agent</h1><p>Applications and tracking</p></header>
+  <div id="notice" role="status" aria-live="polite"></div>
+
+  <section id="connect-section">
+    <h2>Connect</h2>
+    <label>Local server URL<input id="server-url" type="url" placeholder="http://127.0.0.1:.../?token=..."></label>
+    <button id="connect">Connect</button>
+    <small>Run <code>jobagent extension-server</code> first, then paste its URL here. The access token stays in this browser session.</small>
+  </section>
+
+  <section id="overview">
+    <h2>Overview</h2>
+    <p id="summary">Connect to see applications.</p>
+    <p id="sheet-status"></p>
+  </section>
+
+  <details>
+    <summary>Your facts</summary>
+    <form id="profile-form">
+      <label>First name<input name="first_name" required autocomplete="given-name"></label>
+      <label>Last name<input name="last_name" required autocomplete="family-name"></label>
+      <label>Email<input name="email" type="email" required autocomplete="email"></label>
+      <label>Phone<input name="phone" type="tel" autocomplete="tel"></label>
+      <label>Location<input name="location" autocomplete="address-level2"></label>
+      <label>Country<input name="country" autocomplete="country-name"></label>
+      <label>LinkedIn<input name="linkedin" type="url"></label>
+      <label>Website<input name="website" type="url"></label>
+      <label>Other verified answers<textarea name="answers_text" rows="3" placeholder="Question = Answer"></textarea></label>
+      <button>Save facts locally</button>
+    </form>
+  </details>
+
+  <details>
+    <summary>Resume folder</summary>
+    <form id="folder-form">
+      <label>Private folder path<input name="path" required placeholder="/home/you/Resumes"></label>
+      <button>Add folder</button>
+    </form>
+    <small id="folder-list"></small>
+  </details>
+
+  <details>
+    <summary>Reusable context notes</summary>
+    <small>Save verified experience or answers once. Search suggestions before writing an application; these notes never fill forms automatically.</small>
+    <form id="context-add-form">
+      <label>Note title<input name="title" required maxlength="120" placeholder="Project or experience"></label>
+      <label>Verified details<textarea name="body" required maxlength="5000" rows="4"></textarea></label>
+      <button>Save note</button>
+    </form>
+    <form id="context-search-form">
+      <label>Search notes<input name="query" required maxlength="3000" placeholder="Python data pipelines"></label>
+      <button>Find context</button>
+    </form>
+    <ul id="context-suggestions"></ul>
+    <h3>Saved notes</h3><ul id="context-notes"></ul>
+  </details>
+
+  <section>
+    <h2>Current job</h2>
+    <button id="use-selection" type="button">Use selected job text</button>
+    <form id="prepare-form">
+      <label>Company<input name="company" required maxlength="120"></label>
+      <label>Role<input name="title" required maxlength="160"></label>
+      <label>Posting URL<input name="url" type="url" placeholder="https://..."></label>
+      <label>Job description<textarea name="description" rows="5" required maxlength="30000"></textarea></label>
+      <button>Prepare application</button>
+    </form>
+    <small>Uses a matching existing PDF resume. Review its contents before applying.</small>
+  </section>
+
+  <details>
+    <summary>Spreadsheets</summary>
+    <form id="select-sheet-form">
+      <label>Existing spreadsheet ID or URL<input name="sheet" required></label>
+      <button>Use spreadsheet</button>
+    </form>
+    <small>Create a spreadsheet in Google Sheets, add an Applications tab, and share it with your configured service account before selecting it here.</small>
+    <button id="sync-pending" type="button">Sync pending applications</button>
+  </details>
+
+  <section>
+    <h2>Applications</h2>
+    <ul id="applications"></ul>
+    <p id="review-status">No review browser open.</p>
+    <button id="handoff" type="button" disabled>Enable manual actions</button>
+    <button id="close-review" type="button" disabled>Close review browser</button>
+    <small>The browser opens for review first. Enable manual actions only when you are ready to complete the form yourself.</small>
+  </section>
+  <script src="panel.js"></script>
+</body>
+</html>
