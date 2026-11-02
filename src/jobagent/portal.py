@@ -9,7 +9,6 @@ from __future__ import annotations
 import html
 import hashlib
 import json
-import os
 import re
 import secrets
 import threading
@@ -23,6 +22,7 @@ import yaml
 from jobagent.applications import ApplicationStore, application_id
 from jobagent.config import REPO_ROOT, Settings
 from jobagent.profile import ApplicantProfile
+from jobagent.private_storage import secure_home
 from jobagent.safepaths import ensure_private_dir, read_text, write_text
 from jobagent.tracker import TrackerError, spreadsheet_id
 
@@ -40,6 +40,7 @@ def _safe_dir(raw: str) -> Path:
 
 class PortalState:
     def __init__(self, settings: Settings):
+        secure_home(settings.jobagent_home)
         self.settings = settings
         self.store = ApplicationStore(settings.jobagent_home)
         self.token = secrets.token_urlsafe(32)
@@ -432,8 +433,7 @@ table{{width:100%;border-collapse:collapse}}td,th{{padding:.5rem;border-bottom:1
 
 
 def serve(settings: Settings, port: int = 0, *, open_browser: bool = False) -> None:
-    if os.name == "nt":
-        raise PortalError("The private portal requires Linux or WSL until Windows ACL protection is available.")
+    secure_home(settings.jobagent_home, force=True)
     state = PortalState(settings)
 
     class Handler(BaseHTTPRequestHandler):

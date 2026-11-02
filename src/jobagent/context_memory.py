@@ -21,6 +21,7 @@ from qdrant_client import QdrantClient, models
 
 from jobagent.context_index import DIGEST, DIMENSIONS, FeatureHasher, _private
 from jobagent.safepaths import ensure_private_dir, read_text, resolve_within
+from jobagent.private_storage import secure_home
 
 
 COLLECTION = "applicant_notes"
@@ -63,6 +64,7 @@ def _valid_note(note: object) -> bool:
 class ContextMemory:
     def __init__(self, home: Path):
         self.home = _private(home)
+        secure_home(self.home)
         self.directory = ensure_private_dir(self.home / "indexes" / "applicant_context", [self.home])
         self.notes_path = resolve_within(self.home / "context_notes.json", [self.home])
         self._client = None

@@ -7,7 +7,6 @@ bound for this server process; a web page can neither call nor read this API.
 from __future__ import annotations
 
 import json
-import os
 import re
 import secrets
 import threading
@@ -220,8 +219,9 @@ _PATHS = _POST_PATHS | {"/api/status"}
 
 
 def serve(settings: Settings, port: int = 0) -> None:
-    if os.name == "nt":
-        raise PortalError("The private extension server requires Linux or WSL until Windows ACL protection is available.")
+    from jobagent.private_storage import secure_home
+
+    secure_home(settings.jobagent_home, force=True)
     state = PortalState(settings)
     with ThreadingHTTPServer(("127.0.0.1", port), make_handler(state)) as server:
         url = f"http://127.0.0.1:{server.server_port}/?token={state.token}"

@@ -92,6 +92,8 @@ def test_tracker_instructions_select_target_and_sync_only_pending(monkeypatch):
         pdf = home / "output" / "resume.pdf"
         pdf.parent.mkdir(parents=True)
         pdf.write_bytes(b"fictional resume")
+        from jobagent.private_storage import HOME_MARKER_NAME
+        (home / HOME_MARKER_NAME).write_text("jobagent-private-home-v1\n")
         state = PortalState(Settings(_env_file=None, jobagent_home=home))
         record = state.store.save_resume(source_url="https://example.org/one", source_text=None,
                                          company="Example", title="Engineer", pdf=pdf)
@@ -151,13 +153,17 @@ def test_duplicate_extra_answer_labels_do_not_overwrite(monkeypatch):
         assert not state.settings.profile_file.exists()
 
 
-def test_portal_requires_private_storage_support(monkeypatch):
+def test_portal_stops_if_private_storage_cannot_be_secured(monkeypatch):
     from jobagent import portal
+    from jobagent.private_storage import PrivateStorageError
 
-    monkeypatch.setattr(portal, "os", SimpleNamespace(name="nt"))
+    def denied(_home, **_kwargs):
+        raise PrivateStorageError("private Windows storage could not be secured")
+
+    monkeypatch.setattr(portal, "secure_home", denied)
     with tempfile.TemporaryDirectory() as temporary:
         settings = Settings(_env_file=None, jobagent_home=Path(temporary) / "private")
-        with pytest.raises(PortalError, match="Windows ACL"):
+        with pytest.raises(PrivateStorageError, match="private Windows storage"):
             portal.serve(settings)
 
 
@@ -187,7 +193,6 @@ def test_http_handler_rejects_foreign_host_origin_and_missing_token(monkeypatch)
 
         monkeypatch.setattr(portal, "PortalState", lambda settings: state)
         monkeypatch.setattr(portal, "ThreadingHTTPServer", FakeServer)
-        monkeypatch.setattr(portal, "os", SimpleNamespace(name="posix"))
         opened = []
         monkeypatch.setattr(portal.webbrowser, "open", lambda url, new: opened.append((url, new)))
         portal.serve(state.settings, open_browser=True)

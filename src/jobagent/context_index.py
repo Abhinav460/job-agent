@@ -21,6 +21,7 @@ import uuid
 from qdrant_client import QdrantClient, models
 
 from jobagent import safepaths
+from jobagent.private_storage import secure_home
 from jobagent.resume_catalog import MAX_TEXT_CHARS, ResumeCatalog
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -90,6 +91,7 @@ class ContextIndex:
     def __init__(self, home: Path, *, embedder=None, embedding_key: str | None = None):
         self._client = None
         self.home = _private(home)
+        secure_home(self.home)
         if embedder is None:
             self._embedder = FeatureHasher()
             key = "local-feature-hash-v1:512"

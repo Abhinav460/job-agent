@@ -65,8 +65,9 @@ and tracks the application. It must never submit an application itself.
    application and can open a supported form for human review; network writes
    stay blocked until the user explicitly enables manual actions. This flow
    does not tailor the selected resume; the separate LaTeX pipeline does that.
-   Live browser compatibility is unverified. Portal and indexing commands
-   refuse Windows until private ACL support is implemented.
+   Live browser compatibility is unverified. Native Windows private ACL setup
+   is implemented and tested with fictional files; live dashboard use remains
+   unverified.
 7. **Side panel and reusable context (offline verified):** The Chrome panel
    connects to a token-protected loopback server and can manage profile facts,
    resume folders, preparation, review handoff, status, and Sheet sync. Applicant
@@ -75,9 +76,15 @@ and tracks the application. It must never submit an application itself.
    suggestions for manual review; fuzzy matches never fill form answers.
    Resume indexing from separate CLI folder runs preserves prior entries.
    Live Chrome, WSL, and Google API behavior remain unverified. Native Windows
-   use requires private ACL support before it can be enabled. The side panel
+   storage now has fail-closed ACL setup, tested with fictional files. The side panel
    rejects selected descriptions over 30,000 characters so it cannot prepare
    from silently truncated job requirements.
+8. **Native Windows private storage (offline verified):** Before private commands
+   use data, repair and verify a current-user-only NTFS DACL on the dedicated
+   home and existing contents. Reject broad homes, unrecognized existing custom
+   homes, reparse points, and hard-linked files. New files inherit private
+   access. Startup fails if protection cannot be verified. Live dashboard and
+   Chrome behavior with fictional data remain to be checked.
 
 Use a single Sol builder for a substantive milestone. Use Luna for bounded
 exploration or review, and Astra only for a demonstrated hard problem. The

@@ -10,11 +10,15 @@ from jobagent import context_index as context
 from jobagent import resume_catalog
 
 
-def test_windows_cli_index_requires_private_storage_support(monkeypatch):
+def test_index_stops_if_private_storage_cannot_be_secured(monkeypatch):
     from jobagent import cli
+    from jobagent.private_storage import PrivateStorageError
 
-    monkeypatch.setattr(cli, "os", SimpleNamespace(name="nt"))
-    with pytest.raises(RuntimeError, match="Windows ACL"):
+    def denied(_home, **_kwargs):
+        raise PrivateStorageError("private Windows storage could not be secured")
+
+    monkeypatch.setattr(cli, "secure_home", denied)
+    with pytest.raises(PrivateStorageError, match="private Windows storage"):
         cli.cmd_index_resumes(SimpleNamespace(jobagent_home=Path("unused")),
                               SimpleNamespace(folder="unused", recursive=False))
 

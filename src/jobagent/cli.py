@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 from jobagent.config import Settings, get_settings
+from jobagent.private_storage import secure_home
 from jobagent.redaction import setup_logging
 
 log = logging.getLogger("jobagent")
@@ -33,6 +34,7 @@ def _display(path: Path, settings: Settings) -> str:
 
 def cmd_init(settings: Settings, _: argparse.Namespace) -> int:
     home = settings.jobagent_home
+    secure_home(home, force=True)
     home.mkdir(mode=0o700, parents=True, exist_ok=True)
     home.chmod(0o700)
     for sub in HOME_SUBDIRS:
@@ -61,7 +63,14 @@ def cmd_doctor(settings: Settings, _: argparse.Namespace) -> int:
     home = settings.jobagent_home
     report("JOBAGENT_HOME exists", home.is_dir(), "run: jobagent init")
     if home.is_dir():
-        report("JOBAGENT_HOME is private (0700)", home.stat().st_mode & 0o077 == 0, "chmod 700")
+        if os.name == "nt":
+            try:
+                secure_home(home, force=True)
+                report("JOBAGENT_HOME ACL repaired and verified", True)
+            except Exception:
+                report("JOBAGENT_HOME ACL repaired and verified", False, "check NTFS permissions")
+        else:
+            report("JOBAGENT_HOME is private (0700)", home.stat().st_mode & 0o077 == 0, "chmod 700")
     report("bullets.yaml present", settings.bullets_file.is_file())
     if settings.resume_tex.is_file():
         present = latex.markers_present(settings.resume_tex.read_text(encoding="utf-8"))
@@ -257,8 +266,7 @@ def cmd_extension_server(settings: Settings, args: argparse.Namespace) -> int:
 
 
 def cmd_index_resumes(settings: Settings, args: argparse.Namespace) -> int:
-    if os.name == "nt":
-        raise RuntimeError("private resume indexing requires Linux or WSL until Windows ACL support exists")
+    secure_home(settings.jobagent_home, force=True)
     from jobagent.context_index import ContextIndex
     from jobagent.resume_catalog import index_directory
 
@@ -313,6 +321,8 @@ def main(argv: list[str] | None = None) -> int:
                 "extension-server": cmd_extension_server,
                 "index-resumes": cmd_index_resumes}
     try:
+        if args.command not in {"init", "doctor", "portal", "extension-server", "index-resumes"}:
+            secure_home(settings.jobagent_home, force=True)
         return commands[args.command](settings, args)
     except Exception as exc:  # noqa: BLE001
         # Type and redacted message only; full traceback at DEBUG.

@@ -22,9 +22,12 @@ A personal job-application agent. Given a job posting URL or pasted text, it:
 
 This repository is public. The code is shared; the data never is.
 
-Use Linux or WSL for live private data until Windows ACL support is implemented.
-The current `0700`/`0600` directory and file controls use POSIX permissions;
-Windows `chmod` and `umask` do not establish equivalent private access controls.
+On Linux and WSL, private files use `0700`/`0600` permissions. On native Windows,
+commands repair and verify a current-user-only NTFS access control list on the
+private home and its existing contents before using them. New files inherit the
+private access rule. If protection fails, the command stops. Use a dedicated
+`JOBAGENT_HOME` outside the public repository. The default `~/.jobagent`
+location is recognized for migration.
 
 | Rule | How it is enforced |
 | --- | --- |
@@ -123,14 +126,14 @@ exercise a fake service and request arguments offline.
 
 ### Local application workspace
 
-Run the local browser workspace on Linux or WSL. Windows access control lists
-are not implemented yet, so the portal and `index-resumes` refuse to run there.
-On Windows, install an Ubuntu WSL distribution from Administrator PowerShell
-with `wsl --install -d Ubuntu` and restart if requested. Keep the working
-checkout and `$JOBAGENT_HOME` in the Linux home directory, then follow the
-Linux commands below. Windows Chrome can normally reach the WSL loopback URL
-through localhost forwarding. See the official [WSL installation](https://learn.microsoft.com/windows/wsl/install)
-and [networking](https://learn.microsoft.com/windows/wsl/networking) guides.
+Run the local browser workspace on Linux, WSL, or native Windows. On Windows,
+use an NTFS volume and a dedicated private home, such as `~/.jobagent`. The
+first run may take longer while Job Agent repairs and verifies existing file
+permissions. Reparse points and hard-linked files in that home stop startup;
+move those files out of the private home before trying again. An existing
+custom Windows home without Job Agent's private-home marker is rejected so a
+mistaken path cannot change unrelated files. WSL remains an option if you
+prefer a Linux runtime; keep its private home on the Linux filesystem.
 
 ```bash
 uv sync --extra browser --extra tracker
@@ -185,8 +188,7 @@ The tracker instruction box accepts `use spreadsheet <ID or URL>`, `sync all`,
 `sync app-...`, and `show pending`. It accepts only these commands; it does not
 interpret arbitrary prose. The worksheet is named `Applications` and has the
 fixed columns documented above. The portal never submits applications and
-requires a separate click to record that you submitted one yourself. Run live
-private data only on Linux or WSL until Windows ACL protection is implemented.
+requires a separate click to record that you submitted one yourself.
 
 ### Chrome side panel
 
@@ -209,8 +211,7 @@ printed by `extension-server` into **Connect**. The server URL contains a
 random token, stays in Chrome session storage, and expires when the server
 stops. The server accepts the first authenticated extension origin for that
 run and rejects website origins. Keep the URL private. The extension connects
-only to `127.0.0.1`; the server refuses native Windows until private ACL support
-is implemented.
+only to `127.0.0.1`.
 
 The panel can save verified profile facts, add a private resume folder, use
 selected job text from an HTTPS tab, prepare an application, choose a Google

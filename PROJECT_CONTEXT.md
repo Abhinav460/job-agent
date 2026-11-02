@@ -1,6 +1,6 @@
 # Job Agent project context
 
-Updated: 2026-11-01. This is a handoff, not a substitute for checking the
+Updated: 2026-11-02. This is a handoff, not a substitute for checking the
 repository. Start with `git status`, this file, `AGENTS.md`,
 `docs/DEVELOPMENT_PLAN.md`, and `README.md`.
 The general cross-project handoff is `C:\Users\banu_\context-saver\CONTEXT.md`.
@@ -14,9 +14,8 @@ tracks applications. It must never submit an application itself.
 ## Current state
 
 - Repository: `origin` (public GitHub repository; run `git remote -v` for URL).
-- Local branch: `codex/extension-autoapply-sheets`, pushed on 2026-11-01.
-  Feature commit `a92db88` and a subsequent handoff update `aab67c6` are on
-  the branch; verify `git log` for its current head.
+- Local branch: `codex/extension-autoapply-sheets`; verify `git log` and remote
+  tracking status for its current head.
 - GitHub `main` merged the previous workflow branch in `515e8cc`.
 - The dashboard, extension, private resume catalog, context notes, and tracker
   changes are in that pushed branch. Check `git status` before further work.
@@ -42,6 +41,11 @@ tracks applications. It must never submit an application itself.
 - Reviewed the branch for private-data, browser, and external-write behavior.
   The side panel now rejects overlong selected descriptions instead of silently
   truncating them, and ignores stale connection restoration after a manual connect.
+- Added native Windows private-home ACL repair and verification before private
+  commands. Dedicated-home checks reject broad paths, unrecognized existing
+  custom homes, reparse points, and hard-linked files; failures stop startup.
+  The dashboard, extension server, and resume index now allow Windows after
+  the security check.
 
 ## Decisions and boundaries
 
@@ -68,27 +72,28 @@ tracks applications. It must never submit an application itself.
   resume and context indexes, tracker, and browser code; `node --check` passed
   for the side panel. A read-only branch review found no automatic submit path
   or obvious private-data leak. Live side-panel behavior is still unverified.
+- On 2026-11-02, 36 focused Windows tests passed in an isolated test temp root,
+  including real DACL repair, inherited access, and link rejection. The builder
+  also ran 32 neighboring workflow, tracking, and capture tests successfully.
+  A security review found no remaining blocking ACL issue; `git diff --check`
+  passed. The default pytest temp root was inaccessible on this machine, so
+  tests used an isolated temp root outside the repository.
 - A full Windows test run had 2 failures and 5 errors from POSIX permission and
   symlink assumptions and from placing test temp homes inside this public repo.
   Do not present the full suite as passing on Windows.
-- Live Chrome, Google Sheets, and WSL behavior has not been verified.
-- `portal`, `extension-server`, and `index-resumes` refuse native Windows until
-  private ACL support exists. On 2026-10-31, this machine had WSL 2 but only
-  `docker-desktop-data`, no Ubuntu distribution. A request for approval to
-  install Ubuntu WSL was sent; no approval had arrived by this update.
+- Live Chrome, Google Sheets, and WSL behavior has not been verified. Native
+  Windows dashboard behavior with fictional data still needs a manual smoke
+  test. A full-tree ACL scan may be slow for a large browser profile; an
+  initially permissive home has a narrow concurrent-writer race during repair.
 
 ## Next steps
 
-1. Resolve the runtime platform: install Ubuntu WSL with user approval, or
-   implement and review private Windows ACL support. Keep `JOBAGENT_HOME` on a
-   private Linux filesystem if using WSL.
-2. Smoke-test the dashboard and Chrome side panel with fictional profile,
+1. Smoke-test the native Windows dashboard and Chrome side panel with fictional profile,
    resume, posting, and local browser data. Confirm loopback connection and
    review handoff before live use.
-3. Review the draft PR and run live Chrome checks with fictional data in a
-   supported private runtime. Do not assume the branch has been merged into
+2. Open/review a draft PR for this branch. Do not assume it has been merged into
    `main`.
-4. Verify Sheets sync only with the user's own credentials and spreadsheet;
+3. Verify Sheets sync only with the user's own credentials and spreadsheet;
    continue conservative form-adapter work after the local workflow is usable.
 
 ## Future instructions

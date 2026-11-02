@@ -135,6 +135,8 @@ def test_offline_application_workflow(tmp_path, monkeypatch, capsys, use_capture
     # Inject fake settings rather than loading the developer's environment.
     home = tmp_path / "fake-home"
     home.mkdir()
+    from jobagent.private_storage import HOME_MARKER_NAME
+    (home / HOME_MARKER_NAME).write_text("jobagent-private-home-v1\n")
     settings = SimpleNamespace(
         jobagent_home=home, output_dir=home / "output", resume_tex=home / "resume.tex",
         bullets_file=home / "bullets.yaml", profile_file=home / "profile.yaml",
