@@ -1,6 +1,6 @@
 # Job Agent project context
 
-Updated: 2026-11-02. This is a handoff, not a substitute for checking the
+Updated: 2026-11-05 (branch `claude/robust-scraper`). This is a handoff, not a substitute for checking the
 repository. Start with `git status`, this file, `AGENTS.md`,
 `docs/DEVELOPMENT_PLAN.md`, and `README.md`.
 The general cross-project handoff is `C:\Users\banu_\context-saver\CONTEXT.md`.
@@ -48,6 +48,17 @@ tracks applications. It must never submit an application itself.
   The dashboard, extension server, and resume index now allow Windows after
   the security check.
 
+- 2026-11-05 (`claude/robust-scraper`, worktree `../job-agent-scraper`): new
+  `src/jobagent/scrape.py`; `job.fetch_job_text` now tries public ATS APIs
+  (Greenhouse incl. embedded `gh_jid`, Lever, Ashby, Workday, SmartRecruiters,
+  Workable), schema.org JobPosting JSON-LD, boilerplate-stripped main content,
+  then a throwaway headless Chromium render (no profile) for JS-only or 403
+  pages; retries 429/5xx; meta-charset fallback. Verified offline (10 mocked
+  paths) and live (Greenhouse, Lever, Ashby, Workday, python.org, react.dev,
+  Wikipedia via render). SmartRecruiters/Workable live paths are untested.
+- Added Claude Code `.claude/agents/{scout,builder,reviewer}.md` mirroring the
+  Codex agents, plus Claude/Codex worktree coordination rules in `AGENTS.md`.
+
 ## Decisions and boundaries
 
 - This is a public code repository. Never put resumes, profile facts, keys,
@@ -79,9 +90,11 @@ tracks applications. It must never submit an application itself.
   A security review found no remaining blocking ACL issue; `git diff --check`
   passed. The default pytest temp root was inaccessible on this machine, so
   tests used an isolated temp root outside the repository.
-- A full Windows test run had 2 failures and 5 errors from POSIX permission and
-  symlink assumptions and from placing test temp homes inside this public repo.
-  Do not present the full suite as passing on Windows.
+- On 2026-11-05, the full suite passed on Windows (228 passed, 4 skipped) with
+  `--basetemp` outside the repo, after commit `eebe759` made mode-bit asserts
+  POSIX-only and skips the symlink test without symlink privilege. A history
+  scan of all branches found no secrets, resumes, or applicant data; the only
+  personal item is the owner's Gmail in merge commit `515e8cc` author metadata.
 - Live Chrome, Google Sheets, and WSL behavior has not been verified. Native
   Windows dashboard behavior with fictional data still needs a manual smoke
   test. A full-tree ACL scan may be slow for a large browser profile; an
