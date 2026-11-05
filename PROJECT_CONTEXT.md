@@ -1,6 +1,6 @@
 # Job Agent project context
 
-Updated: 2026-11-05. This is a handoff, not a substitute for checking the
+Updated: 2026-11-05 (branch `claude/robust-scraper`). This is a handoff, not a substitute for checking the
 repository. Start with `git status`, this file, `AGENTS.md`,
 `docs/DEVELOPMENT_PLAN.md`, and `README.md`.
 The general cross-project handoff is `C:\Users\banu_\context-saver\CONTEXT.md`.
@@ -47,6 +47,17 @@ tracks applications. It must never submit an application itself.
   custom homes, reparse points, and hard-linked files; failures stop startup.
   The dashboard, extension server, and resume index now allow Windows after
   the security check.
+
+- 2026-11-05 (`claude/robust-scraper`, worktree `../job-agent-scraper`): new
+  `src/jobagent/scrape.py`; `job.fetch_job_text` now tries public ATS APIs
+  (Greenhouse incl. embedded `gh_jid`, Lever, Ashby, Workday, SmartRecruiters,
+  Workable), schema.org JobPosting JSON-LD, boilerplate-stripped main content,
+  then a throwaway headless Chromium render (no profile) for JS-only or 403
+  pages; retries 429/5xx; meta-charset fallback. Verified offline (10 mocked
+  paths) and live (Greenhouse, Lever, Ashby, Workday, python.org, react.dev,
+  Wikipedia via render). SmartRecruiters/Workable live paths are untested.
+- Added Claude Code `.claude/agents/{scout,builder,reviewer}.md` mirroring the
+  Codex agents, plus Claude/Codex worktree coordination rules in `AGENTS.md`.
 
 ## Decisions and boundaries
 
