@@ -1,5 +1,6 @@
 """Runs the whole pipeline with fake LLMs, a fake index and a fake compiler."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -132,7 +133,8 @@ def test_checkpoint_survives_restart(settings):
     config = {"configurable": {"thread_id": graph.thread_id(None, "posting text")}}
     with pytest.raises(RuntimeError):
         make_app(settings, fakes, graph.open_checkpointer(settings)).invoke({"source_text": "posting text"}, config)
-    assert settings.checkpoint_db.stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":  # Windows protects private files with ACLs, not mode bits
+        assert settings.checkpoint_db.stat().st_mode & 0o777 == 0o600
 
     fakes.fail_compile = False  # "restart": new app, new connection, same DB
     app = make_app(settings, fakes, graph.open_checkpointer(settings))

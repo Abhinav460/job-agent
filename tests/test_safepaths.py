@@ -8,8 +8,9 @@ from jobagent import safepaths
 def test_inside_root_allowed(tmp_path):
     out = safepaths.write_text(tmp_path / "a" / "b.txt", "x", [tmp_path])
     assert out.read_text() == "x"
-    assert out.stat().st_mode & 0o777 == 0o600
-    assert out.parent.stat().st_mode & 0o777 == 0o700
+    if os.name != "nt":  # Windows protects private files with ACLs, not mode bits
+        assert out.stat().st_mode & 0o777 == 0o600
+        assert out.parent.stat().st_mode & 0o777 == 0o700
 
 
 def test_traversal_rejected(tmp_path):
@@ -25,7 +26,10 @@ def test_symlink_escape_rejected(tmp_path):
     root.mkdir()
     outside.mkdir()
     (outside / "secret.txt").write_text("s")
-    os.symlink(outside, root / "link")
+    try:
+        os.symlink(outside, root / "link")
+    except OSError:
+        pytest.skip("creating symlinks requires extra privileges on this system")
     with pytest.raises(safepaths.PathOutsideWorkingDirs):
         safepaths.read_text(root / "link" / "secret.txt", [root])
 
