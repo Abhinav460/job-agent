@@ -1,6 +1,6 @@
 # Job Agent project context
 
-Updated: 2026-11-02. This is a handoff, not a substitute for checking the
+Updated: 2026-11-05. This is a handoff, not a substitute for checking the
 repository. Start with `git status`, this file, `AGENTS.md`,
 `docs/DEVELOPMENT_PLAN.md`, and `README.md`.
 The general cross-project handoff is `C:\Users\banu_\context-saver\CONTEXT.md`.
@@ -14,9 +14,10 @@ tracks applications. It must never submit an application itself.
 ## Current state
 
 - Repository: `origin` (public GitHub repository; run `git remote -v` for URL).
-- Local branch: `codex/extension-autoapply-sheets`; verify `git log` and remote
-  tracking status for its current head. Windows ACL milestone `3c508c5` was
-  pushed on 2026-11-02. Draft PR: https://github.com/Abhinav460/job-agent/pull/2.
+- This worktree: `C:\Users\banu_\job-agent-qdrant-review` on
+  `codex/qdrant-resume-review-isolated`, branched from `0ea4aae`. The earlier
+  `codex/extension-autoapply-sheets` branch has draft PR #2:
+  https://github.com/Abhinav460/job-agent/pull/2. Verify remote tracking before work.
 - GitHub `main` merged the previous workflow branch in `515e8cc`.
 - The dashboard, extension, private resume catalog, context notes, and tracker
   changes are in that pushed branch. Check `git status` before further work.
@@ -47,6 +48,11 @@ tracks applications. It must never submit an application itself.
   custom homes, reparse points, and hard-linked files; failures stop startup.
   The dashboard, extension server, and resume index now allow Windows after
   the security check.
+- Added a reviewable Qdrant resume shortlist in the dashboard and Chrome panel.
+  Preview shows up to five PDF filenames, local overlap scores, and matched
+  terms. A random preview ID and file digest bind an explicit choice; stale
+  previews, edited dashboard job fields, and changed files require a new preview.
+  The feature research is in `docs/FEATURE_RESEARCH.md`.
 
 ## Decisions and boundaries
 
@@ -79,6 +85,12 @@ tracks applications. It must never submit an application itself.
   A security review found no remaining blocking ACL issue; `git diff --check`
   passed. The default pytest temp root was inaccessible on this machine, so
   tests used an isolated temp root outside the repository.
+- On 2026-11-05, 38 focused offline tests passed on the isolated feature branch
+  (`test_portal`, `test_extension_server`, `test_context_index`, and
+  `test_resume_catalog`) with a temp root outside the repository. `node --check`
+  on the panel and `git diff --check` passed. A read-only review found and then
+  confirmed fixes for stale cross-tab previews and delayed panel responses.
+  No live dashboard or Chrome smoke test was performed.
 - A full Windows test run had 2 failures and 5 errors from POSIX permission and
   symlink assumptions and from placing test temp homes inside this public repo.
   Do not present the full suite as passing on Windows.
@@ -90,8 +102,8 @@ tracks applications. It must never submit an application itself.
 ## Next steps
 
 1. Smoke-test the native Windows dashboard and Chrome side panel with fictional profile,
-   resume, posting, and local browser data. Confirm loopback connection and
-   review handoff before live use.
+   resumes, posting, and local browser data. Confirm preview, explicit resume
+   choice, loopback connection, and review handoff before live use.
 2. Review draft PR #2. Do not assume it has been merged into `main`.
 3. Verify Sheets sync only with the user's own credentials and spreadsheet;
    continue conservative form-adapter work after the local workflow is usable.

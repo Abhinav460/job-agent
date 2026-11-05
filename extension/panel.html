@@ -72,9 +72,10 @@
       <label>Role<input name="title" required maxlength="160"></label>
       <label>Posting URL<input name="url" type="url" placeholder="https://..."></label>
       <label>Job description<textarea name="description" rows="5" required maxlength="30000"></textarea></label>
-      <button>Prepare application</button>
+      <button>Preview matching resumes</button>
     </form>
-    <small>Uses a matching existing PDF resume. Review its contents before applying.</small>
+    <small>Compare matching PDF resumes and choose one before creating the application.</small>
+    <ol id="resume-choices"></ol>
   </section>
 
   <details>

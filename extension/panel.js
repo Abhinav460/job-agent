@@ -1,6 +1,7 @@
 const storage = chrome.storage.session;
 let connection = null;
 let connectionVersion = 0;
+let resumePreviewVersion = 0;
 
 const byId = (id) => document.getElementById(id);
 const notice = (message) => { byId("notice").textContent = message; };
@@ -109,6 +110,32 @@ function renderSuggestions(suggestions) {
   }
 }
 
+function renderResumeChoices(previewId, choices) {
+  const list = byId("resume-choices");
+  list.replaceChildren();
+  for (const choice of choices) {
+    const item = document.createElement("li");
+    const title = document.createElement("strong");
+    title.textContent = choice.name;
+    const evidence = document.createElement("small");
+    evidence.textContent = `Score ${choice.score} | Matched terms: ${choice.matched_terms.join(", ") || "none"}`;
+    const prepare = document.createElement("button");
+    prepare.type = "button";
+    prepare.textContent = "Prepare with this resume";
+    prepare.addEventListener("click", async () => {
+      const result = await action("prepare", {
+        preview_id: previewId, resume_id: choice.id, digest: choice.digest
+      });
+      if (result) {
+        ++resumePreviewVersion;
+        renderResumeChoices("", []);
+      }
+    });
+    item.append(title, evidence, prepare);
+    list.append(item);
+  }
+}
+
 async function refresh({reloadProfile = false} = {}) {
   const state = await api("status");
   byId("summary").textContent = `${state.applications.length} recent applications | ${state.pending} pending sync`;
@@ -141,6 +168,8 @@ byId("connect").addEventListener("click", async () => {
   const version = ++connectionVersion;
   try {
     connection = parseServerUrl(byId("server-url").value.trim());
+    ++resumePreviewVersion;
+    renderResumeChoices("", []);
     await refresh({reloadProfile: true});
     if (version !== connectionVersion) return;
     await storage.set({jobAgentConnection: connection});
@@ -174,6 +203,8 @@ byId("use-selection").addEventListener("click", async () => {
     if (!form.elements.namedItem("title").value && selected.title.length <= 160) {
       form.elements.namedItem("title").value = selected.title;
     }
+    ++resumePreviewVersion;
+    renderResumeChoices("", []);
     notice("Selected job text loaded. Check the company and role before preparing.");
   } catch (error) {
     notice(error.message);
@@ -181,13 +212,32 @@ byId("use-selection").addEventListener("click", async () => {
 });
 
 for (const [formId, endpoint] of [["profile-form", "profile"], ["folder-form", "folder"],
-                                  ["prepare-form", "prepare"], ["select-sheet-form", "sheet"],
+                                  ["select-sheet-form", "sheet"],
                                   ["context-add-form", "context-add"]]) {
   byId(formId).addEventListener("submit", async (event) => {
     event.preventDefault();
     await action(endpoint, formValues(event.currentTarget));
   });
 }
+byId("prepare-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const version = ++resumePreviewVersion;
+  renderResumeChoices("", []);
+  try {
+    const result = await api("resume-preview", formValues(event.currentTarget));
+    if (version !== resumePreviewVersion) return;
+    await refresh();
+    if (version !== resumePreviewVersion) return;
+    notice(result.message || "Done.");
+    renderResumeChoices(result.preview_id, result.choices || []);
+  } catch (error) {
+    if (version === resumePreviewVersion) notice(error.message);
+  }
+});
+byId("prepare-form").addEventListener("input", () => {
+  ++resumePreviewVersion;
+  renderResumeChoices("", []);
+});
 byId("context-search-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const result = await action("context-search", formValues(event.currentTarget));
@@ -201,6 +251,8 @@ storage.get("jobAgentConnection").then(async ({jobAgentConnection}) => {
   if (!jobAgentConnection || connectionVersion !== 0) return;
   const version = ++connectionVersion;
   connection = jobAgentConnection;
+  ++resumePreviewVersion;
+  renderResumeChoices("", []);
   try {
     await refresh({reloadProfile: true});
     if (version === connectionVersion) notice("Connected to the local Job Agent server.");

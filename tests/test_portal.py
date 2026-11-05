@@ -54,6 +54,80 @@ def test_prepare_copies_ranked_pdf_and_records_application(monkeypatch):
             state.prepare(company="Example", title="", url="", description="Python")
 
 
+def test_resume_preview_requires_explicit_choice_and_rejects_stale_file(monkeypatch):
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        folder = root / "resumes"
+        folder.mkdir()
+        first = folder / "python.pdf"
+        second = folder / "data.pdf"
+        first.write_bytes(b"fictional Python resume")
+        second.write_bytes(b"fictional data resume")
+
+        def catalog(path):
+            documents = []
+            for source, text in ((first, "Python automation"), (second, "Python data pipelines")):
+                documents.append(ResumeDocument(
+                    "resume-" + hashlib.sha256(str(source.resolve()).encode()).hexdigest()[:24],
+                    source, "ready", text, hashlib.sha256(source.read_bytes()).hexdigest()))
+            return ResumeCatalog(path, tuple(documents))
+
+        monkeypatch.setattr("jobagent.resume_catalog.index_directory", catalog)
+        settings = Settings(_env_file=None, jobagent_home=root / "private")
+        state = PortalState(settings)
+        state.add_folder(str(folder))
+        job = {"company": "Example", "title": "Python Engineer", "url": "",
+               "description": "Python data pipelines"}
+
+        preview_id, choices = state.preview_resumes(**job)
+        assert [choice["name"] for choice in choices] == ["data.pdf", "python.pdf"]
+        assert "data" in choices[0]["matched_terms"]
+        assert state.records() == []
+        assert not settings.output_dir.exists()
+        assert "fictional data resume" not in _page(state)
+        assert f'name="preview_id" value="{preview_id}"' in _page(state)
+        assert 'formaction="/prepare"' in _page(state)
+        with pytest.raises(PortalError, match="Preview resumes"):
+            state.prepare_selected(preview_id=preview_id, resume_id=choices[1]["id"],
+                                   digest="0" * 64)
+
+        newer_id, same_choices = state.preview_resumes(**job)
+        assert newer_id != preview_id
+        assert same_choices[0]["id"] == choices[0]["id"]
+        assert same_choices[0]["digest"] == choices[0]["digest"]
+        with pytest.raises(PortalError, match="Preview resumes"):
+            state.prepare_selected(preview_id=preview_id, resume_id=choices[0]["id"],
+                                   digest=choices[0]["digest"])
+        assert state.records() == []
+
+        with pytest.raises(PortalError, match="Job details changed"):
+            state.prepare_selected(preview_id=newer_id, resume_id=choices[0]["id"],
+                                   digest=choices[0]["digest"],
+                                   current_job=("Different", job["title"], job["url"], job["description"]))
+        newer_id, _ = state.preview_resumes(**job)
+
+        second.write_bytes(b"changed fictional data resume")
+        with pytest.raises(PortalError, match="changed"):
+            state.prepare_selected(preview_id=newer_id, resume_id=choices[0]["id"],
+                                   digest=choices[0]["digest"])
+        assert state.records() == []
+        assert not settings.output_dir.exists()
+
+        refreshed_id, refreshed = state.preview_resumes(**job)
+        with pytest.raises(PortalError, match="Enter a company"):
+            state.preview_resumes(**{**job, "company": ""})
+        with pytest.raises(PortalError, match="Preview resumes"):
+            state.prepare_selected(preview_id=refreshed_id, resume_id=refreshed[1]["id"],
+                                   digest=refreshed[1]["digest"])
+        refreshed_id, refreshed = state.preview_resumes(**job)
+        identifier, _ = state.prepare_selected(
+            preview_id=refreshed_id, resume_id=refreshed[1]["id"],
+            digest=refreshed[1]["digest"])
+        record = state.store.get(identifier)
+        assert (settings.jobagent_home / record.resume_path).read_bytes() == first.read_bytes()
+        assert state.resume_preview is None
+
+
 def test_folder_must_be_outside_public_repository():
     from jobagent.config import REPO_ROOT
 

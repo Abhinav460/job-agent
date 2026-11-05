@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import json
 import tempfile
 from email.message import Message
@@ -12,6 +13,7 @@ from types import SimpleNamespace
 from jobagent.config import Settings
 from jobagent.extension_server import make_handler
 from jobagent.portal import PortalState
+from jobagent.resume_catalog import ResumeCatalog, ResumeDocument
 
 
 ORIGIN_A = "chrome-extension://" + "a" * 32
@@ -129,3 +131,49 @@ def test_rejects_bad_json_and_does_not_echo_private_values():
         assert private.encode() not in rejected["body"]
         assert _request(handler, "POST", "/api/missing", token=state.token,
                         data={})["status"] == 403
+
+
+def test_extension_resume_preview_and_explicit_selection(monkeypatch):
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        folder = root / "resumes"
+        folder.mkdir()
+        source = folder / "fictional.pdf"
+        source.write_bytes(b"fictional PDF bytes")
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        document = ResumeDocument(
+            "resume-" + hashlib.sha256(str(source.resolve()).encode()).hexdigest()[:24],
+            source, "ready", "Python SQL pipelines", digest)
+        monkeypatch.setattr("jobagent.resume_catalog.index_directory",
+                            lambda path: ResumeCatalog(path, (document,)))
+        state = PortalState(Settings(_env_file=None, jobagent_home=root / "private"))
+        state.add_folder(str(folder))
+        handler = make_handler(state)
+
+        def post(path, data):
+            return _request(handler, "POST", path, token=state.token, data=data)
+
+        denied = post("/api/prepare", {"resume_id": document.id, "digest": digest})
+        assert denied["status"] == 400
+        preview = post("/api/resume-preview", {
+            "company": "Example", "title": "Python Engineer", "url": "",
+            "description": "Python SQL pipelines"})
+        assert preview["status"] == 200
+        assert state.records() == []
+        assert not (root / "private" / "output").exists()
+        choice = preview["json"]["choices"][0]
+        assert choice["name"] == "fictional.pdf"
+        assert choice["digest"] == digest
+        preview_id = preview["json"]["preview_id"]
+        assert isinstance(preview_id, str) and len(preview_id) >= 32
+        assert "Python SQL pipelines" not in preview["body"].decode()
+        assert str(folder) not in preview["body"].decode()
+        denied = post("/api/prepare", {"preview_id": preview_id,
+                                       "resume_id": document.id, "digest": "0" * 64})
+        assert denied["status"] == 400
+        prepared = post("/api/prepare", {"preview_id": preview_id,
+                                         "resume_id": choice["id"], "digest": choice["digest"]})
+        assert prepared["status"] == 200
+        assert len(state.records()) == 1
+        assert post("/api/prepare", {"preview_id": preview_id,
+                                      "resume_id": choice["id"], "digest": choice["digest"]})["status"] == 400

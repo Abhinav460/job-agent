@@ -165,10 +165,14 @@ Running `index-resumes` for another folder keeps entries from earlier folders.
 The portal refreshes its index from all folders configured in the workspace.
 
 For **Prepare an application**, enter a company, role, posting URL, and job
-description. The portal ranks the content of existing resumes, copies the
-best matching readable PDF into the private output folder under a company name,
-and records the application. It preserves the original PDF bytes. This flow
-selects an existing resume; it does not rewrite or compile a tailored resume.
+description, then preview the matching readable PDFs. The portal shows the top
+five matches with filenames, ranking scores, and shared terms. Choose the PDF
+you want before it creates a private company-named copy and records the
+application. Scores compare local text overlap; they are not hiring or fit
+probabilities. Previewing alone creates no application or output PDF. If the
+selected resume changes after preview, preview again. The original PDF bytes
+are preserved. This flow selects an existing resume; it does not rewrite or
+compile a tailored resume.
 Use `jobagent tailor` for the LaTeX tailoring pipeline. Review the selected PDF
 and every form field yourself before submission. Extra profile answers are
 filled only when an exact, unique question label matches a saved answer and the
@@ -214,8 +218,9 @@ run and rejects website origins. Keep the URL private. The extension connects
 only to `127.0.0.1`.
 
 The panel can save verified profile facts, add a private resume folder, use
-selected job text from an HTTPS tab, prepare an application, choose a Google
-Sheet, sync records, and open a form for review. Browser review begins with
+selected job text from an HTTPS tab, preview and choose a matching PDF resume,
+prepare an application, choose a Google Sheet, sync records, and open a form for
+review. Browser review begins with
 manual actions paused. Click **Enable manual actions** only when ready to
 complete the form yourself. **Record submitted** requires a separate explicit
 confirmation after you have submitted the application. The agent never clicks

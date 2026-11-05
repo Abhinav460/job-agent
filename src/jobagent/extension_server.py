@@ -65,10 +65,16 @@ def _dispatch(state: PortalState, path: str, payload: dict[str, str]) -> dict[st
     elif path == "/api/folder":
         state.add_folder(payload.get("path", ""))
         message = "Resume folder added."
-    elif path == "/api/prepare":
-        identifier, method = state.prepare(
+    elif path == "/api/resume-preview":
+        preview_id, choices = state.preview_resumes(
             company=payload.get("company", ""), title=payload.get("title", ""),
             url=payload.get("url", ""), description=payload.get("description", ""))
+        return {"message": f"Found {len(choices)} matching PDF resume(s). Choose one below.",
+                "preview_id": preview_id, "choices": choices}
+    elif path == "/api/prepare":
+        identifier, method = state.prepare_selected(
+            preview_id=payload.get("preview_id", ""), resume_id=payload.get("resume_id", ""),
+            digest=payload.get("digest", ""))
         synced = state.sync(identifier)
         message = (f"Application {identifier} prepared with {method} matching. "
                    + ("Sheet synced." if synced else "Sheet sync pending."))
@@ -211,7 +217,8 @@ def make_handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-_POST_PATHS = frozenset({"/api/profile", "/api/folder", "/api/prepare", "/api/sheet",
+_POST_PATHS = frozenset({"/api/profile", "/api/folder", "/api/resume-preview",
+                         "/api/prepare", "/api/sheet",
                          "/api/sync-pending", "/api/sync", "/api/review",
                          "/api/handoff", "/api/close", "/api/submitted",
                          "/api/context-add", "/api/context-delete", "/api/context-search"})

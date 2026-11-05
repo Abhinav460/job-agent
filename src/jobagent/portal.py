@@ -53,6 +53,8 @@ class PortalState:
         self.context_lock = threading.Lock()
         self.context_query = ""
         self.context_results = []
+        self.resume_lock = threading.Lock()
+        self.resume_preview = None
 
     @property
     def folders_path(self) -> Path:
@@ -164,9 +166,9 @@ class PortalState:
         write_text(self.settings.profile_file, yaml.safe_dump(facts, sort_keys=False),
                    [self.settings.jobagent_home])
 
-    def prepare(self, *, company: str, title: str, url: str, description: str) -> tuple[str, str]:
+    def _resume_matches(self, *, company: str, title: str, url: str, description: str):
         from jobagent.context_index import ContextIndex
-        from jobagent.resume_catalog import ResumeCatalog, copy_for_company, index_directory, rank_resumes
+        from jobagent.resume_catalog import ResumeCatalog, index_directory, rank_resumes
 
         company, title, url, description = (s.strip() for s in (company, title, url, description))
         if not company or not title or len(company) > 120 or len(title) > 160:
@@ -196,16 +198,69 @@ class PortalState:
         candidates = {hit.document_id for hit in hits}
         shortlist = tuple(d for d in pdfs if d.id in candidates) or pdfs
         matches = rank_resumes(ResumeCatalog(root=Path.home(), documents=shortlist),
-                               title + "\n" + description, limit=1)
+                               title + "\n" + description, limit=5)
         if not matches:
             raise PortalError("No resume could be matched to this role.")
+        return (company, title, url, description), matches
+
+    def preview_resumes(self, *, company: str, title: str, url: str, description: str):
+        with self.resume_lock:
+            self.resume_preview = None
+            request, matches = self._resume_matches(
+                company=company, title=title, url=url, description=description)
+            choices = [{"id": match.document.id, "digest": match.document.digest,
+                        "name": match.document.path.name, "score": round(match.score, 3),
+                        "matched_terms": match.matched_terms, "method": match.method}
+                       for match in matches]
+            preview_id = secrets.token_urlsafe(32)
+            self.resume_preview = (preview_id, request, choices)
+            return preview_id, choices
+
+    def prepare_selected(self, *, preview_id: str, resume_id: str, digest: str,
+                         current_job: tuple[str, str, str, str] | None = None) -> tuple[str, str]:
+        with self.resume_lock:
+            preview = self.resume_preview
+            if (preview is None or not isinstance(preview_id, str)
+                    or not secrets.compare_digest(preview[0], preview_id)
+                    or not any(
+                    choice["id"] == resume_id and choice["digest"] == digest
+                    for choice in preview[2])):
+                raise PortalError("Preview resumes and choose one before preparing.")
+            (company, title, url, description), _ = preview[1:]
+            if (current_job is not None and tuple(value.strip() for value in current_job)
+                    != (company, title, url, description)):
+                self.resume_preview = None
+                raise PortalError("Job details changed; preview resumes again before preparing.")
+            _, matches = self._resume_matches(
+                company=company, title=title, url=url, description=description)
+            selected = next((match for match in matches
+                             if match.document.id == resume_id and match.document.digest == digest), None)
+            if selected is None:
+                self.resume_preview = None
+                raise PortalError("The selected resume changed; preview again before preparing.")
+            identifier, method = self._save_prepared(
+                company=company, title=title, url=url, description=description, match=selected)
+            self.resume_preview = None
+            return identifier, method
+
+    def _save_prepared(self, *, company: str, title: str, url: str, description: str, match):
+        from jobagent.resume_catalog import copy_for_company
+
         identifier = application_id(url or None, description)
         output = ensure_private_dir(self.settings.output_dir / identifier,
                                     [self.settings.jobagent_home])
-        pdf = copy_for_company(matches[0].document, company, output)
+        pdf = copy_for_company(match.document, company, output)
         record = self.store.save_resume(source_url=url or None, source_text=description,
                                         company=company, title=title, pdf=pdf)
-        return record.id, "local Qdrant + " + matches[0].method
+        return record.id, "local Qdrant + " + match.method
+
+    def prepare(self, *, company: str, title: str, url: str, description: str) -> tuple[str, str]:
+        """Legacy programmatic preparation; browser interfaces require a preview."""
+        with self.resume_lock:
+            request, matches = self._resume_matches(
+                company=company, title=title, url=url, description=description)
+            return self._save_prepared(company=request[0], title=request[1], url=request[2],
+                                       description=request[3], match=matches[0])
 
     def sync(self, identifier: str) -> bool:
         try:
@@ -359,6 +414,17 @@ def _page(state: PortalState) -> str:
     suggestions = "".join(
         f'<li><strong>{_e(hit.note.title)}</strong><p>{_e(hit.note.body)}</p></li>'
         for hit in state.context_results)
+    resume_preview_id, resume_request, resume_choices = state.resume_preview or (
+        "", ("", "", "", ""), [])
+    resume_heading = (f"Resume choices for {_e(resume_request[0])} — {_e(resume_request[1])}"
+                      if resume_choices else "Resume choices")
+    resume_options = "".join(
+        f'<li><strong>{_e(choice["name"])}</strong> '
+        f'<small>Score {_e(choice["score"])} · Matched terms: '
+        f'{_e(", ".join(choice["matched_terms"]) or "none")}</small>'
+        f'<button name="resume_choice" value="{_e(choice["id"])}:{_e(choice["digest"])}" '
+        'formaction="/prepare">Prepare with this resume</button></li>'
+        for choice in resume_choices)
     records = state.records()
     status_counts = {status: sum(record.status == status for record in records)
                      for status in ("resume_ready", "review_needed", "blocked", "submitted")}
@@ -411,11 +477,13 @@ table{{width:100%;border-collapse:collapse}}td,th{{padding:.5rem;border-bottom:1
 <section id="resumes"><h2>2. Resume folders</h2><ul>{folders}</ul><form method="post" action="/folder"><input type="hidden" name="token" value="{token}">
 <label>Folder path<input name="path" required placeholder="/home/you/Resumes"></label><button>Add folder</button></form>
 <small>PDF resumes can be attached automatically. Other supported documents can be indexed for future preparation.</small></section>
-<section id="prepare"><h2>3. Prepare an application</h2><form method="post" action="/prepare"><input type="hidden" name="token" value="{token}">
-<label>Company<input name="company" required></label><label>Role title<input name="title" required></label>
-<label>Application URL<input name="url" type="url" placeholder="https://..."></label>
-<label>Job description<textarea name="description" rows="10" required maxlength="30000"></textarea></label>
-<button>Choose resume and save application</button></form></section>
+<section id="prepare"><h2>3. Prepare an application</h2><form method="post" action="/resume-preview"><input type="hidden" name="token" value="{token}"><input type="hidden" name="preview_id" value="{_e(resume_preview_id)}">
+<label>Company<input name="company" required maxlength="120" value="{_e(resume_request[0])}"></label><label>Role title<input name="title" required maxlength="160" value="{_e(resume_request[1])}"></label>
+<label>Application URL<input name="url" type="url" placeholder="https://..." value="{_e(resume_request[2])}"></label>
+<label>Job description<textarea name="description" rows="10" required maxlength="30000">{_e(resume_request[3])}</textarea></label>
+<button>Preview matching resumes</button>
+<h3>{resume_heading}</h3><p><small>Compare these PDF filenames and matched terms, then choose one. Preview again after changing the job details.</small></p>
+<ol>{resume_options or '<li>Preview a job to see matching PDF resumes.</li>'}</ol></form></section>
 <section id="tracker"><h2>4. Tracker</h2><p>{_e(sheet_label)} · {pending} application(s) pending for this spreadsheet.</p>
 <form method="post" action="/sheet"><input type="hidden" name="token" value="{token}">
 <label>Google Sheets spreadsheet ID or editor URL<input name="sheet" required autocomplete="off"></label>
@@ -507,10 +575,18 @@ def serve(settings: Settings, port: int = 0, *, open_browser: bool = False) -> N
                     state.notice = f"Synced {done} pending application(s); {failed} still pending."
                 elif path == "/instruction":
                     state.notice = state.instruction(form.get("instruction", ""))
-                elif path == "/prepare":
-                    identifier, method = state.prepare(
+                elif path == "/resume-preview":
+                    _, choices = state.preview_resumes(
                         company=form.get("company", ""), title=form.get("title", ""),
                         url=form.get("url", ""), description=form.get("description", ""))
+                    state.notice = f"Found {len(choices)} matching PDF resume(s). Choose one below."
+                elif path == "/prepare":
+                    resume_id, _, digest = form.get("resume_choice", "").partition(":")
+                    identifier, method = state.prepare_selected(
+                        preview_id=form.get("preview_id", ""),
+                        resume_id=resume_id, digest=digest,
+                        current_job=tuple(form.get(key, "") for key in
+                                          ("company", "title", "url", "description")))
                     synced = state.sync(identifier)
                     state.notice = (f"Application {identifier} prepared with {method} matching. "
                                     + ("Sheet synced." if synced else "Sheet sync pending."))

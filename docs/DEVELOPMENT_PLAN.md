@@ -14,6 +14,7 @@ and tracks the application. It must never submit an application itself.
 - [x] Portal profile entry, resume selection, and application preparation with an unchanged PDF copy (offline verified).
 - [x] Chrome side panel and token-protected loopback API for dashboard actions (offline verified).
 - [x] Private reusable context notes with embedded Qdrant search (offline verified).
+- [x] Reviewable Qdrant resume shortlist and explicit PDF choice in portal and side panel (offline verified).
 - [x] Private applicant profile and conservative Greenhouse HTML form filling (offline verified).
 - [x] Conservative Lever global/EU hosted form adapter for name and email (offline verified).
 - [x] Explicit selection-only capture for JavaScript/login-walled postings (offline verified).
@@ -85,6 +86,15 @@ and tracks the application. It must never submit an application itself.
    homes, reparse points, and hard-linked files. New files inherit private
    access. Startup fails if protection cannot be verified. Live dashboard and
    Chrome behavior with fictional data remain to be checked.
+9. **Reviewable resume choice (offline verified):** Preview up to five readable
+   PDF matches with filenames, local overlap scores, and matching terms before
+   creating an application. The dashboard and Chrome panel require an explicit
+   choice. A random preview ID and file digest bind the choice to the latest
+   preview; changed job fields or changed files require a fresh preview. Preview
+   updates the derived private Qdrant index but creates no application record or
+   output PDF. Ranking remains lexical by default. Live UI behavior still needs
+   a smoke test with fictional data. See `docs/FEATURE_RESEARCH.md` for the
+   evaluated follow-up options.
 
 Use a single Sol builder for a substantive milestone. Use Luna for bounded
 exploration or review, and Astra only for a demonstrated hard problem. The
