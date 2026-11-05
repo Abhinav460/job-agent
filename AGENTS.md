@@ -24,6 +24,21 @@ private applicant data while developing or testing. Use fake fixtures.
 - Follow `docs/USAGE_PLAN.md` for model choice and allowance checks. If the
   dashboard is unavailable, keep one builder and avoid Astra.
 
+## Claude Code and Codex working together
+
+Both assistants may run at the same time. Matching agents exist for each:
+Codex in `.codex/agents/*.toml`, Claude Code in `.claude/agents/*.md`
+(`scout` read-only search, `builder` one bounded task, `reviewer` read-only review).
+
+- Each assistant works in its own git worktree on its own branch
+  (`codex/...` or `claude/...`), e.g. `git worktree add ../job-agent-<task> -b claude/<task>`.
+  Do not switch branches, reset, stash, or edit files in another assistant's worktree.
+- Never force-push or reset a branch the other assistant has pushed to. Integrate with a
+  merge or a PR instead, and leave the other assistant's commits in place.
+- Stage only files you changed (`git add <paths>`, never `git add -A`).
+- Record which branch/worktree you are using and its status in `PROJECT_CONTEXT.md`
+  and the shared `CONTEXT.md`, so the other assistant can see who owns what.
+
 ## Work sequence
 
 1. Read the relevant code and tests, and state a concrete outcome.
