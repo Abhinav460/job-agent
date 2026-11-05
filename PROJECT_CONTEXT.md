@@ -1,6 +1,6 @@
 # Job Agent project context
 
-Updated: 2026-11-02. This is a handoff, not a substitute for checking the
+Updated: 2026-11-05. This is a handoff, not a substitute for checking the
 repository. Start with `git status`, this file, `AGENTS.md`,
 `docs/DEVELOPMENT_PLAN.md`, and `README.md`.
 The general cross-project handoff is `C:\Users\banu_\context-saver\CONTEXT.md`.
@@ -79,9 +79,11 @@ tracks applications. It must never submit an application itself.
   A security review found no remaining blocking ACL issue; `git diff --check`
   passed. The default pytest temp root was inaccessible on this machine, so
   tests used an isolated temp root outside the repository.
-- A full Windows test run had 2 failures and 5 errors from POSIX permission and
-  symlink assumptions and from placing test temp homes inside this public repo.
-  Do not present the full suite as passing on Windows.
+- On 2026-11-05, the full suite passed on Windows (228 passed, 4 skipped) with
+  `--basetemp` outside the repo, after commit `eebe759` made mode-bit asserts
+  POSIX-only and skips the symlink test without symlink privilege. A history
+  scan of all branches found no secrets, resumes, or applicant data; the only
+  personal item is the owner's Gmail in merge commit `515e8cc` author metadata.
 - Live Chrome, Google Sheets, and WSL behavior has not been verified. Native
   Windows dashboard behavior with fictional data still needs a manual smoke
   test. A full-tree ACL scan may be slow for a large browser profile; an
