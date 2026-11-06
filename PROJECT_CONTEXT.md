@@ -59,7 +59,23 @@ tracks applications. It must never submit an application itself.
 - Added Claude Code `.claude/agents/{scout,builder,reviewer}.md` mirroring the
   Codex agents, plus Claude/Codex worktree coordination rules in `AGENTS.md`.
 
+- 2026-11-06 (`claude/autofill`, stacked on `claude/robust-scraper`): on-page
+  Autofill button (`extension/content.js`, relayed by `background.js`; pages
+  never see the token), `src/jobagent/autofill.py` planner (deterministic profile
+  matches, then optional Groq via `GROQ_API_KEY`), `/api/autofill` and
+  `/api/applied`, `ApplicationStore.record_applied`. Verified: planner guardrails
+  and endpoints offline; content script in headless Chromium on a fake form
+  (labels, radio, select, checkbox, late fields, no overwrite, one log per page,
+  no button on non-form pages); Groq request shape mocked; full suite passes.
+  Not yet verified: real Groq key, real ATS pages, loaded unpacked extension.
+
 ## Decisions and boundaries
+
+- 2026-11-06 user decision: AI (Groq) may fill fields beyond exact matches,
+  constrained to saved facts (choice = exact option, free text = substring of
+  facts) and highlighted for review; the user's own Submit/Apply click on an
+  autofilled page counts as confirmation to record `submitted` and sync.
+  This supersedes the earlier exact-match-only fill rule for the extension.
 
 - This is a public code repository. Never put resumes, profile facts, keys,
   browser data, generated PDFs, or application records in it. Do not read or

@@ -113,6 +113,20 @@ class ApplicationStore:
                  pdf.relative_to(self.home.resolve()).as_posix(), "resume_ready", _now()))
             return self._get(db, identifier)
 
+    def record_applied(self, *, source_url: str, company: str, title: str) -> ApplicationRecord:
+        """The user clicked Submit/Apply themselves on this page: mark it submitted.
+
+        Creates a record (without a resume) when the job was not prepared here.
+        """
+        identifier = application_id(source_url, None)
+        with self.transaction() as db:
+            db.execute("""INSERT INTO applications VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET status=excluded.status,
+                updated_at=excluded.updated_at""",
+                (identifier, company, title, public_posting_url(source_url), "",
+                 "submitted", _now()))
+            return self._get(db, identifier)
+
     def set_status(self, identifier: str, status: Status, *, confirmed: bool = False):
         if status not in STATUSES:
             raise ValueError("unsupported application status")

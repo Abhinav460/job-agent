@@ -228,6 +228,23 @@ suggestions for you to inspect; it never fills a form from a fuzzy match.
 Resume matching uses a separate local Qdrant index. Both indexes work without
 a hosted vector database or embedding API.
 
+### On-page autofill and automatic tracking
+
+With the side panel connected, an **Autofill** button appears on any HTTPS page
+that looks like an application form (including embedded ATS iframes):
+
+- Profile fields and exact saved answers fill first (green outline).
+- If `GROQ_API_KEY` is set in `.env`, Groq fills remaining fields from your saved
+  profile facts only (amber outline). Choice answers must be one of the field's
+  options and free-text answers must appear in your facts; anything else stays
+  blank. Your profile facts and the form's labels are sent to Groq.
+- Fields you already typed in, file uploads, and passwords are never touched.
+- It never clicks Submit or Apply. When **you** click Submit/Apply on a page you
+  autofilled, the application is recorded as submitted and synced to your Sheet
+  (or kept pending if the Sheet is unavailable). Logged once per page.
+
+Custom dropdown widgets that are not real `<select>` elements are not filled yet.
+
 ### Browser filling and human review
 
 Install `uv sync --extra browser` and `uv run playwright install chromium`.

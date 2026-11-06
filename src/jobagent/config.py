@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     google_api_key: SecretStr | None = None
     gemini_model: str = "gemini-3.8-flash"
 
+    # Groq (optional): AI form filling in the extension. Off when the key is unset.
+    groq_api_key: SecretStr | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+
     # Qdrant bullet bank
     qdrant_url: str | None = None
     qdrant_api_key: SecretStr | None = None

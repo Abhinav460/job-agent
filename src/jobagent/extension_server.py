@@ -105,9 +105,33 @@ def _dispatch(state: PortalState, path: str, payload: dict[str, str]) -> dict[st
                 "suggestions": [{"id": hit.note.id, "title": hit.note.title,
                                  "body": hit.note.body, "score": round(hit.score, 3)}
                                 for hit in suggestions]}
+    elif path == "/api/autofill":
+        return _autofill(state, payload)
+    elif path == "/api/applied":
+        record = state.store.record_applied(
+            source_url=payload.get("url", ""), company=payload.get("company", "")[:120] or "Unknown",
+            title=payload.get("title", "")[:160] or "Unknown")
+        synced = state.sync(record.id)
+        message = "Application logged as submitted. " + ("Sheet synced." if synced else "Sheet sync pending.")
     else:
         raise PortalError("Unknown action.")
     return {"message": message}
+
+
+def _autofill(state: PortalState, payload: dict[str, str]) -> dict[str, Any]:
+    from jobagent import autofill
+
+    try:
+        fields = autofill.validate_fields(payload.get("fields", ""))
+        complete = None
+        if state.settings.groq_api_key is not None:
+            complete = autofill.groq_complete(state.settings.groq_api_key.get_secret_value(),
+                                              state.settings.groq_model)
+        values, note = autofill.plan(fields, _profile(state), complete)
+    except autofill.AutofillError as exc:
+        raise PortalError(str(exc)) from None
+    return {"values": values,
+            "message": f"Filled {len(values)} of {len(fields)} field(s). Review before you apply. {note}".strip()}
 
 
 def make_handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
@@ -214,7 +238,8 @@ def make_handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
 _POST_PATHS = frozenset({"/api/profile", "/api/folder", "/api/prepare", "/api/sheet",
                          "/api/sync-pending", "/api/sync", "/api/review",
                          "/api/handoff", "/api/close", "/api/submitted",
-                         "/api/context-add", "/api/context-delete", "/api/context-search"})
+                         "/api/context-add", "/api/context-delete", "/api/context-search",
+                         "/api/autofill", "/api/applied"})
 _PATHS = _POST_PATHS | {"/api/status"}
 
 
